@@ -225,7 +225,7 @@ function renderDashboard() {
           : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-outline-variant text-on-surface-variant font-label-sm text-label-sm"><th class="pb-sm px-sm">FECHA</th><th class="pb-sm px-sm">CLIENTE</th><th class="pb-sm px-sm">PAGO</th><th class="pb-sm px-sm text-right">TOTAL</th></tr></thead><tbody class="font-body-md text-body-md">${recent.map(v => `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
               <td class="py-md px-sm">${fmtDate(v.fecha)}</td>
-              <td class="py-md px-sm">${v.clienteNombre ? esc(v.clienteNombre) : '\u2014'}</td>
+              <td class="py-md px-sm">${esc(v.clienteNombre || v.cliente || (v.clienteId ? (clientes.find(c => c.id === v.clienteId)?.nombre || '') : '') || '\u2014')}</td>
               <td class="py-md px-sm"><span class="${v.pago === 'Cr\u00E9dito' ? 'bg-warning-bg text-warning' : 'bg-success-bg text-success'} px-sm py-1 rounded-full text-xs font-bold uppercase">${esc(v.pago || 'Contado')}</span></td>
               <td class="py-md px-sm text-right font-bold text-on-surface">${fmtMoney(v.total)}</td>
             </tr>
@@ -566,7 +566,7 @@ async function deleteCliente(id) {
 }
 
 function exportClientePDF(id) {
-  if (typeof jspdf === 'undefined') { toast('Error al cargar la librería PDF', 'error'); return; }
+  if (typeof window.jspdf === 'undefined') { toast('Error al cargar la librería PDF', 'error'); return; }
   const clientes = DB.get('clientes');
   const c = clientes.find(x => x.id === id);
   if (!c) { toast('Cliente no encontrado', 'error'); return; }
@@ -575,155 +575,267 @@ function exportClientePDF(id) {
   const cobrar = DB.get('cobrar').filter(x => x.clienteId === id);
   const deudaPendiente = cobrar.filter(x => x.estado !== 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
   const totalPagado = cobrar.filter(x => x.estado === 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
+  const totalComprado = ventas.reduce((s, v) => s + (+v.total || 0), 0);
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW = 210;
   const margin = 15;
   const contentW = pageW - margin * 2;
-  let y = margin;
+  const primary = [0, 62, 199];
+  const primaryLight = [223, 227, 255];
+  const surfaceLow = [242, 243, 255];
+  const gray = [115, 118, 134];
+  const secondary = [0, 110, 47];
+  const secondaryLight = [107, 255, 143];
+  const error = [186, 26, 26];
 
-  // Colors
-  const primary = [42, 20, 180];
-  const gray = [100, 100, 120];
-  const lightGray = [240, 242, 248];
+  // ── Receipt card background ──
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'F');
+  doc.setDrawColor(195, 197, 217);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'S');
 
-  // Header bar
-  doc.setFillColor(primary[0], primary[1], primary[2]);
-  doc.rect(0, 0, pageW, 28, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.text('Glowup Store', margin, 18);
-  doc.setFontSize(9);
-  doc.text('Reporte de Cliente', pageW - margin, 18, { align: 'right' });
+  let x = margin + 10;
+  let y = 24;
+  const innerW = contentW - 20;
 
-  y = 38;
+  // ── PAID stamp overlay (if no pending debt) ──
+  if (deudaPendiente === 0 && totalPagado > 0) {
+    doc.setTextColor(0, 110, 47);
+    doc.setFontSize(36);
+    doc.setFont(undefined, 'bold');
+    doc.text('PAGADO', pageW - margin - 20, 45, { align: 'right', angle: -15 });
+  } else if (deudaPendiente > 0) {
+    doc.setTextColor(186, 26, 26);
+    doc.setFontSize(36);
+    doc.setFont(undefined, 'bold');
+    doc.text('PENDIENTE', pageW - margin - 20, 45, { align: 'right', angle: -15 });
+  }
 
-  // Client info card
-  doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.roundedRect(margin, y, contentW, 36, 3, 3, 'F');
-  doc.setTextColor(20, 20, 30);
-  doc.setFontSize(13);
+  // ── Header ──
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
   doc.setFont(undefined, 'bold');
-  doc.text(c.nombre || 'Sin nombre', margin + 6, y + 9);
-  doc.setFont(undefined, 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(gray[0], gray[1], gray[2]);
-  let infoX = margin + 6;
-  let infoY = y + 18;
-  if (c.cedula) { doc.text('Cédula: ' + c.cedula, infoX, infoY); infoX += 60; }
-  if (c.telefono) { doc.text('Tel: ' + c.telefono, infoX, infoY); infoX += 60; }
-  infoX = margin + 6; infoY += 7;
-  if (c.email) { doc.text('Email: ' + c.email, infoX, infoY); infoX += 60; }
-  if (c.direccion) { doc.text('Dir: ' + c.direccion, infoX, infoY); }
-
-  y += 46;
-
-  // Summary cards
-  const cardW = (contentW - 8) / 3;
-  function summaryCard(x, label, value, color) {
-    doc.setFillColor(color[0], color[1], color[2]);
-    doc.roundedRect(x, y, cardW, 18, 3, 3, 'F');
-    doc.setTextColor(gray[0], gray[1], gray[2]);
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text(label, x + 4, y + 6);
-    doc.setTextColor(20, 20, 30);
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text(value, x + 4, y + 14);
-  }
-  summaryCard(margin, 'Compras realizadas', '' + ventas.length, [232, 240, 254]);
-  summaryCard(margin + cardW + 4, 'Total pagado', '$' + totalPagado.toFixed(2), [232, 254, 232]);
-  summaryCard(margin + (cardW + 4) * 2, 'Deuda pendiente', '$' + deudaPendiente.toFixed(2), [254, 232, 232]);
-
-  y += 28;
-
-  // Sales table
-  if (ventas.length > 0) {
-    doc.setTextColor(20, 20, 30);
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('Historial de Compras', margin, y);
-    y += 4;
-
-    const salesRows = ventas.map(v => [
-      v.fecha || '',
-      v.clienteNombre || 'Consumidor final',
-      (v.items || []).map(i => i.nombre + ' x' + i.qty).join(', '),
-      '$' + (+v.total || 0).toFixed(2),
-      v.pago || 'Contado',
-    ]);
-    doc.autoTable({
-      startY: y,
-      head: [['Fecha', 'Cliente', 'Productos', 'Total', 'Pago']],
-      body: salesRows,
-      theme: 'plain',
-      headStyles: { fillColor: primary, fontSize: 8, halign: 'center' },
-      bodyStyles: { fontSize: 7 },
-      columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 'auto' },
-        3: { cellWidth: 20, halign: 'right' },
-        4: { cellWidth: 18, halign: 'center' },
-      },
-      margin: { left: margin, right: margin },
-      styles: { cellPadding: 1.5 },
-      tableLineWidth: 0.1,
-      tableLineColor: [220, 220, 230],
-    });
-    y = doc.lastAutoTable.finalY + 8;
-  }
-
-  // Debts table
-  if (cobrar.length > 0) {
-    if (y > 250) { doc.addPage(); y = margin + 10; }
-    doc.setTextColor(20, 20, 30);
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('Cuentas por Cobrar / Abonos', margin, y);
-    y += 4;
-
-    const debtRows = cobrar.map(x => [
-      x.concepto || '',
-      '$' + (+x.monto || 0).toFixed(2),
-      x.fecha || '',
-      x.vence || '',
-      x.estado || 'Pendiente',
-    ]);
-    doc.autoTable({
-      startY: y,
-      head: [['Concepto', 'Monto', 'Fecha', 'Vence', 'Estado']],
-      body: debtRows,
-      theme: 'plain',
-      headStyles: { fillColor: primary, fontSize: 8, halign: 'center' },
-      bodyStyles: { fontSize: 7 },
-      columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 22, halign: 'right' },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 18, halign: 'center' },
-      },
-      margin: { left: margin, right: margin },
-      styles: { cellPadding: 1.5 },
-      tableLineWidth: 0.1,
-      tableLineColor: [220, 220, 230],
-    });
-    y = doc.lastAutoTable.finalY + 8;
-  }
-
-  // Footer
-  if (y > 270) doc.addPage();
-  doc.setDrawColor(200, 200, 210);
-  doc.line(margin, y, pageW - margin, y);
+  doc.text('Glowup Store', x, y);
   y += 5;
   doc.setTextColor(gray[0], gray[1], gray[2]);
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
-  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }), margin, y);
-  doc.text('Glowup Store © Todos los derechos reservados', pageW - margin, y, { align: 'right' });
+  doc.text('REPORTE DE CLIENTE', x, y);
+
+  // Customer & Receipt info
+  y += 10;
+  doc.setDrawColor(195, 197, 217);
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 28, 4, 4, 'FD');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text(c.nombre || 'Sin nombre', x + 6, y + 8);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+
+  let cX = x + 6;
+  let cY = y + 18;
+  if (c.cedula) { doc.text('C\u00E9dula: ' + c.cedula, cX, cY); cX += 55; }
+  if (c.telefono) { doc.text('Tel: ' + c.telefono, cX, cY); cX += 55; }
+  if (c.email) { doc.text(c.email, cX, cY); }
+
+  cX = x + 6; cY += 5;
+  if (c.direccion) { doc.text('Dir: ' + c.direccion, cX, cY); }
+
+  y += 38;
+
+  // Right-side info (date)
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Fecha', x + innerW - 40, 42);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text(today(), x + innerW - 40, 49);
+
+  // ── Summary badges ──
+  y += 2;
+  const badgeW = (innerW - 8) / 3;
+  function badge(cx, label, val, bg) {
+    doc.setFillColor(bg[0], bg[1], bg[2]);
+    doc.roundedRect(cx, y, badgeW, 16, 4, 4, 'F');
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'normal');
+    doc.text(label, cx + 4, y + 5);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(val, cx + 4, y + 13);
+  }
+  badge(x, 'Compras', '' + ventas.length, primaryLight);
+  badge(x + badgeW + 4, 'Pagado', '$' + totalPagado.toFixed(2), [232, 254, 232]);
+  badge(x + (badgeW + 4) * 2, 'Pendiente', '$' + deudaPendiente.toFixed(2), [255, 218, 214]);
+
+  y += 26;
+
+  // ── Sales section (ITEM | CANT | TOTAL style) ──
+  if (ventas.length > 0) {
+    doc.setDrawColor(195, 197, 217);
+    doc.line(x, y, x + innerW, y);
+    y += 2;
+
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Historial de Compras', x, y += 6);
+
+    // Table header
+    y += 3;
+    doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+    doc.rect(x, y, innerW, 6, 'F');
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    const col1 = x + 4;
+    const colQty = x + innerW - 36;
+    const colTotal = x + innerW - 4;
+    doc.text('ITEM', col1, y + 4);
+    doc.text('CANT', colQty, y + 4);
+    doc.text('TOTAL', colTotal, y + 4, { align: 'right' });
+    y += 9;
+
+    ventas.forEach(function(v, i) {
+      if (y > 265) { doc.addPage(); y = 20; }
+      (v.items || []).forEach(function(item, j) {
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text(item.nombre || 'Producto', col1, y);
+        doc.setFontSize(8);
+        doc.setTextColor(gray[0], gray[1], gray[2]);
+        doc.text('$' + (+item.precio || 0).toFixed(2) + ' / und', col1, y + 3.5);
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text('' + item.qty, colQty, y);
+
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('$' + (+item.qty * +item.precio || 0).toFixed(2), colTotal, y, { align: 'right' });
+
+        y += 8;
+      });
+      // Sale total line
+      doc.setDrawColor(240, 242, 248);
+      doc.line(x, y - 1, x + innerW, y - 1);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(primary[0], primary[1], primary[2]);
+      doc.text(fmtDate(v.fecha) + ' - ' + (v.pago || 'Contado'), col1, y + 1);
+      doc.text('$' + (+v.total || 0).toFixed(2), colTotal, y + 1, { align: 'right' });
+      y += 7;
+    });
+    y += 4;
+  }
+
+  // ── Summary box ──
+  if (y > 255) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 4;
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 24, 4, 4, 'F');
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Subtotal comprado', x + 6, y + 7);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.text('$' + totalComprado.toFixed(2), x + innerW - 6, y + 7, { align: 'right' });
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Total pagado', x + 6, y + 14);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(secondary[0], secondary[1], secondary[2]);
+  doc.text('$' + totalPagado.toFixed(2), x + innerW - 6, y + 14, { align: 'right' });
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Deuda pendiente', x + 6, y + 21);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(error[0], error[1], error[2]);
+  doc.text('$' + deudaPendiente.toFixed(2), x + innerW - 6, y + 21, { align: 'right' });
+
+  y += 32;
+
+  // ── Debts detail ──
+  if (cobrar.length > 0) {
+    if (y > 255) { doc.addPage(); y = 20; }
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Cuentas por Cobrar', x, y);
+    y += 3;
+
+    // Header
+    doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+    doc.rect(x, y, innerW, 6, 'F');
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    const dc1 = x + 4;
+    const dc2 = x + innerW - 50;
+    const dc3 = x + innerW - 28;
+    const dc4 = x + innerW - 4;
+    doc.text('CONCEPTO', dc1, y + 4);
+    doc.text('VENCE', dc2, y + 4);
+    doc.text('MONTO', dc3, y + 4);
+    doc.text('ESTADO', dc4, y + 4, { align: 'right' });
+    y += 9;
+
+    cobrar.forEach(function(cb) {
+      if (y > 268) { doc.addPage(); y = 20; }
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text(cb.concepto || '', dc1, y);
+      doc.setFontSize(8);
+      doc.text(cb.vence || '\u2014', dc2, y);
+      doc.setFont(undefined, 'bold');
+      doc.text('$' + (+cb.monto || 0).toFixed(2), dc3, y);
+      doc.setTextColor(cb.estado === 'Pagado' ? secondary[0] : error[0], cb.estado === 'Pagado' ? secondary[1] : error[1], cb.estado === 'Pagado' ? secondary[2] : error[2]);
+      doc.setFont(undefined, 'bold');
+      doc.text(cb.estado || 'Pendiente', dc4, y, { align: 'right' });
+      y += 6;
+    });
+    y += 4;
+  }
+
+  // ── Footer ──
+  if (y > 272) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }), x, y);
+
+  // Decorative dots
+  const dotX = x + innerW / 2;
+  doc.setFillColor(195, 197, 217);
+  [-6, 0, 6].forEach(function(offset) {
+    doc.circle(dotX + offset, y + 4, 1, 'F');
+  });
 
   doc.save('cliente_' + (c.nombre || 'cliente').replace(/\s+/g, '_') + '.pdf');
   toast('PDF exportado');
@@ -859,12 +971,19 @@ function renderVentas() {
   document.getElementById('ven-search')?.addEventListener('input', debounce(renderVentas, 250));
 }
 
+function toggleCuotas() {
+  const pago = document.getElementById('v-pago').value;
+  document.getElementById('v-cuotas-container').classList.toggle('hidden', pago !== 'Crédito');
+}
+
 function openVentaForm() {
   saleItems = [];
   editingId = null;
   document.getElementById('v-fecha').value = today();
   document.getElementById('v-notas').value = '';
   document.getElementById('v-pago').value = 'Efectivo';
+  document.getElementById('v-cuotas').value = 1;
+  toggleCuotas();
   const sel = document.getElementById('v-cliente');
   sel.innerHTML = '<option value="">— Consumidor final —</option>' + DB.get('clientes').map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
   renderSaleItems();
@@ -938,13 +1057,21 @@ function saveVenta() {
   DB.set('ventas', ventas);
 
   if (pago === 'Crédito' && clienteId) {
+    const cuotas = Math.max(1, parseInt(document.getElementById('v-cuotas').value) || 1);
+    const montoCuota = +(total / cuotas).toFixed(2);
     const cobrar = DB.get('cobrar');
-    cobrar.push({
-      id: uid(), clienteId, clienteNombre, monto: total,
-      fecha: venta.fecha, vence: '',
-      concepto: `Venta a crédito - ${itemsValidos.map(i => i.nombre).join(', ')}`,
-      estado: 'Pendiente', ventaId: venta.id,
-    });
+    const fechaBase = venta.fecha ? new Date(venta.fecha + 'T12:00:00') : new Date();
+    for (let i = 0; i < cuotas; i++) {
+      const vence = new Date(fechaBase);
+      vence.setMonth(vence.getMonth() + i + 1);
+      cobrar.push({
+        id: uid(), clienteId, clienteNombre,
+        monto: i === cuotas - 1 ? +(total - montoCuota * (cuotas - 1)).toFixed(2) : montoCuota,
+        fecha: venta.fecha, vence: vence.toISOString().slice(0, 10),
+        concepto: `Cuota ${i + 1}/${cuotas} - ${itemsValidos.map(i => i.nombre).join(', ')}`,
+        estado: 'Pendiente', ventaId: venta.id,
+      });
+    }
     DB.set('cobrar', cobrar);
   }
 
