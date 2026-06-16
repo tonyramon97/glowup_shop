@@ -741,12 +741,25 @@ function importData() {
   input.click();
 }
 
+function triggerFab() {
+  if (currentPage === 'inventario') openProductoForm();
+  else if (currentPage === 'clientes') openClienteForm();
+  else if (currentPage === 'ventas') openVentaForm();
+  else if (currentPage === 'finanzas') {
+    const ftab = document.getElementById('ftab-state')?.dataset.ftab || 'cobrar';
+    if (ftab === 'cobrar') openCobrarForm();
+    else openPagarForm();
+  }
+}
+
 // ══════════════════════════════════════
 //  EVENT DELEGATION
 // ══════════════════════════════════════
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-nav]');
   if (t) { e.preventDefault(); navigate(t.dataset.nav); return; }
+  const fab = e.target.closest('[data-fab]');
+  if (fab) { triggerFab(); return; }
   const pg = e.target.closest('[data-page]');
   if (pg) { e.preventDefault(); navigate(pg.dataset.page); return; }
 
@@ -864,17 +877,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (menu && !menu.contains(e.target)) menu.classList.add('hidden');
   });
 
-  // FAB
-  document.getElementById('fab-add')?.addEventListener('click', () => {
-    if (currentPage === 'inventario') openProductoForm();
-    else if (currentPage === 'clientes') openClienteForm();
-    else if (currentPage === 'ventas') openVentaForm();
-    else if (currentPage === 'finanzas') {
-      const ftab = document.getElementById('ftab-state')?.dataset.ftab || 'cobrar';
-      if (ftab === 'cobrar') openCobrarForm();
-      else openPagarForm();
-    }
-  });
+  document.getElementById('fab-add')?.addEventListener('click', triggerFab);
 
   // Export / Import via data-action delegation + direct buttons
   document.getElementById('btn-export')?.addEventListener('click', exportData);

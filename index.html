@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>MiNegocio - Dashboard</title>
+<title>Glowup Store</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <link rel="manifest" href="manifest.json"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="MiNegocio"/>
+<meta name="apple-mobile-web-app-title" content="Glowup Store"/>
 <meta name="theme-color" content="#2a14b4"/>
 <script>
 tailwind.config = {
@@ -201,7 +201,7 @@ tailwind.config = {
 <main class="px-margin-mobile py-8 space-y-8 max-w-4xl mx-auto" id="content"></main>
 
 <!-- FAB -->
-<button class="fixed right-6 bottom-24 w-16 h-16 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center transition-all active:scale-90 z-40" id="fab-add">
+<button class="fixed right-6 bottom-24 w-16 h-16 bg-primary text-white rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center transition-all active:scale-90 z-40" id="fab-add" data-fab>
   <span class="material-symbols-outlined text-3xl">add</span>
 </button>
 
@@ -473,23 +473,23 @@ tailwind.config = {
 <!-- Bottom Navigation -->
 <nav class="bg-surface/90 backdrop-blur-2xl fixed bottom-0 w-full z-50 border-t border-outline-variant/30 px-2 safe-bottom">
   <div class="flex justify-around items-center h-16" id="bottom-nav">
-    <button class="nav-item flex flex-col items-center justify-center text-primary transition-all duration-200 min-w-0 px-1" data-page="dashboard">
+    <button class="nav-item flex flex-col items-center justify-center text-primary transition-all duration-200 min-w-0 px-1" data-nav="dashboard" data-page="dashboard">
       <span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">grid_view</span>
       <span class="font-label-md text-[10px] mt-0.5 font-bold uppercase tracking-tighter">Dashboard</span>
     </button>
-    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-page="inventario">
+    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-nav="inventario" data-page="inventario">
       <span class="material-symbols-outlined text-[28px]">inventory_2</span>
       <span class="font-label-md text-[10px] mt-0.5 font-bold uppercase tracking-tighter">Stock</span>
     </button>
-    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-page="ventas">
+    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-nav="ventas" data-page="ventas">
       <span class="material-symbols-outlined text-[28px]">payments</span>
       <span class="font-label-md text-[10px] mt-0.5 font-bold uppercase tracking-tighter">Ventas</span>
     </button>
-    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-page="clientes">
+    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-nav="clientes" data-page="clientes">
       <span class="material-symbols-outlined text-[28px]">group</span>
       <span class="font-label-md text-[10px] mt-0.5 font-bold uppercase tracking-tighter">Clientes</span>
     </button>
-    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-page="finanzas">
+    <button class="nav-item flex flex-col items-center justify-center text-on-surface-variant/60 transition-all duration-200 active:opacity-70 min-w-0 px-1" data-nav="finanzas" data-page="finanzas">
       <span class="material-symbols-outlined text-[28px]">account_balance_wallet</span>
       <span class="font-label-md text-[10px] mt-0.5 font-bold uppercase tracking-tighter">Finanzas</span>
     </button>

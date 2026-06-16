@@ -1,6 +1,6 @@
 {
-  "name": "MiNegocio - Uniformes & Maquillaje",
-  "short_name": "MiNegocio",
+  "name": "Glowup Store",
+  "short_name": "Glowup",
   "description": "Gestión de inventario, clientes, ventas y cuentas",
   "start_url": "/",
   "display": "standalone",
