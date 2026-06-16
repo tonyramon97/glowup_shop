@@ -128,7 +128,7 @@ function renderDashboard() {
 
   document.getElementById('content').innerHTML = `
     <section class="mb-xl">
-      <h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Hola, Glowup Store</h2>
+      <h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Hola Mi Reina</h2>
       <p class="font-body-md text-body-md text-on-surface-variant">As\u00ED va tu negocio hoy.</p>
     </section>
 
@@ -281,14 +281,18 @@ function renderInventario() {
     const badgeClass = out ? 'bg-error/10 text-error' : low ? 'bg-warning-bg text-warning' : 'bg-success-bg text-success';
     const badgeText = out ? 'Sin Stock' : low ? 'Stock Bajo' : 'En Stock';
     const badgeCount = out ? '' : ' (' + stock + ')';
-    const iconMap = { 'Uniformes m\u00E9dicos': 'medical_services', Maquillaje: 'palette', Accesorios: 'watch' };
+    const iconMap = { 'Uniformes m\u00E9dicos': 'medical_services', 'Chompa m\u00E9dica': 'checkroom', Pantal\u00F3n: 'checkroom', Camiseta: 'checkroom', Chaqueta: 'checkroom', Camisa: 'checkroom', Blusa: 'checkroom', Maquillaje: 'palette', Accesorios: 'watch' };
     const icon = iconMap[p.categoria] || 'inventory_2';
     const iconBg = out ? 'bg-gray-100' : low ? 'bg-warning-bg' : 'bg-success-bg';
     const iconColor = out ? 'text-gray-400' : low ? 'text-warning' : 'text-success';
+    const imgSrc = p.imagen && p.imagen.startsWith('data:');
     return '<div class="group bg-surface border border-outline-variant rounded-xl p-md flex items-center gap-md hover:shadow-md transition-all cursor-pointer' + (out ? ' opacity-80' : '') + '">' +
-      '<div class="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ' + iconBg + '">' +
-        '<span class="material-symbols-outlined ' + iconColor + '">' + icon + '</span>' +
-      '</div>' +
+      (imgSrc
+        ? '<div class="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-surface-container-low"><img src="' + p.imagen + '" class="w-full h-full object-cover" loading="lazy"></div>'
+        : '<div class="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ' + iconBg + '">' +
+          '<span class="material-symbols-outlined ' + iconColor + '">' + icon + '</span>' +
+        '</div>'
+      ) +
       '<div class="flex-grow min-w-0">' +
         '<div class="flex justify-between items-start">' +
           '<h3 class="font-body-md font-semibold text-on-surface truncate">' + esc(p.nombre) + '</h3>' +
@@ -297,6 +301,8 @@ function renderInventario() {
         '<div class="flex items-center gap-sm mt-xs">' +
           '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + badgeClass + '">' + badgeText + badgeCount + '</span>' +
           '<span class="text-on-surface-variant text-[11px]">' + esc(p.categoria) + '</span>' +
+          (p.marca ? '<span class="text-on-surface-variant text-[11px]">\u2022 ' + esc(p.marca) + '</span>' : '') +
+          (p.color ? '<span class="text-on-surface-variant text-[11px]">\u2022 ' + esc(p.color) + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="flex gap-1 shrink-0">' +
@@ -337,18 +343,54 @@ function openProductoForm(id) {
   editingId = id || null;
   const p = id ? DB.get('productos').find(x => x.id === id) : null;
   document.getElementById('modal-producto-title').textContent = p ? 'Editar producto' : 'Nuevo producto';
-  ['p-nombre', 'p-costo', 'p-venta', 'p-stock', 'p-stock-min', 'p-desc'].forEach(f => document.getElementById(f).value = '');
+  ['p-nombre', 'p-marca', 'p-color', 'p-costo', 'p-venta', 'p-stock', 'p-stock-min', 'p-desc'].forEach(f => document.getElementById(f).value = '');
   document.getElementById('p-categoria').value = 'Uniformes médicos';
+  removeProductImage();
   if (p) {
     document.getElementById('p-nombre').value = p.nombre || '';
+    document.getElementById('p-marca').value = p.marca || '';
+    document.getElementById('p-color').value = p.color || '';
     document.getElementById('p-categoria').value = p.categoria || 'Uniformes médicos';
     document.getElementById('p-costo').value = p.costo || '';
     document.getElementById('p-venta').value = p.venta || '';
     document.getElementById('p-stock').value = p.stock || '';
     document.getElementById('p-stock-min').value = p.stockMin || '';
     document.getElementById('p-desc').value = p.descripcion || '';
+    if (p.imagen) {
+      const img = document.getElementById('p-image-preview');
+      img.src = p.imagen;
+      img.classList.remove('hidden');
+      document.getElementById('p-image-placeholder').classList.add('hidden');
+      document.getElementById('p-image-text').classList.add('hidden');
+      document.getElementById('p-image-remove').classList.remove('hidden');
+    }
   }
   openModal('modal-producto');
+}
+
+function previewProductImage(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = document.getElementById('p-image-preview');
+    img.src = ev.target.result;
+    img.classList.remove('hidden');
+    document.getElementById('p-image-placeholder').classList.add('hidden');
+    document.getElementById('p-image-text').classList.add('hidden');
+    document.getElementById('p-image-remove').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProductImage() {
+  const img = document.getElementById('p-image-preview');
+  img.src = '';
+  img.classList.add('hidden');
+  document.getElementById('p-image-input').value = '';
+  document.getElementById('p-image-placeholder').classList.remove('hidden');
+  document.getElementById('p-image-text').classList.remove('hidden');
+  document.getElementById('p-image-remove').classList.add('hidden');
 }
 
 function saveProducto() {
@@ -357,12 +399,15 @@ function saveProducto() {
   const producto = {
     id: editingId || uid(),
     nombre,
+    marca: document.getElementById('p-marca').value.trim(),
+    color: document.getElementById('p-color').value.trim(),
     categoria: document.getElementById('p-categoria').value,
     costo: document.getElementById('p-costo').value,
     venta: document.getElementById('p-venta').value,
     stock: document.getElementById('p-stock').value,
     stockMin: document.getElementById('p-stock-min').value,
     descripcion: document.getElementById('p-desc').value.trim(),
+    imagen: document.getElementById('p-image-preview').src || '',
   };
   const lista = DB.get('productos');
   if (editingId) {
@@ -744,7 +789,17 @@ function saveVenta() {
 
 async function deleteVenta(id) {
   if (!await showConfirm('¿Eliminar esta venta?')) return;
+  const venta = DB.get('ventas').find(x => x.id === id);
+  if (venta) {
+    const productos = DB.get('productos');
+    (venta.items || []).forEach(item => {
+      const p = productos.find(x => x.id === item.productoId);
+      if (p && p.stock !== '') p.stock = +p.stock + item.qty;
+    });
+    DB.set('productos', productos);
+  }
   DB.set('ventas', DB.get('ventas').filter(x => x.id !== id));
+  DB.set('cobrar', DB.get('cobrar').filter(x => x.ventaId !== id));
   toast('Venta eliminada');
   renderVentas();
 }
@@ -1147,16 +1202,6 @@ document.addEventListener('click', e => {
 // ─── INIT ───
 document.addEventListener('DOMContentLoaded', () => {
   navigate('dashboard');
-
-  // Menu toggle for settings dropdown
-  document.getElementById('menu-toggle')?.addEventListener('click', e => {
-    e.stopPropagation();
-    document.getElementById('settings-menu')?.classList.toggle('hidden');
-  });
-  document.addEventListener('click', e => {
-    const menu = document.getElementById('settings-menu');
-    if (menu && !menu.contains(e.target)) menu.classList.add('hidden');
-  });
 
   document.getElementById('fab-add')?.addEventListener('click', triggerFab);
 
