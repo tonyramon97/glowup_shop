@@ -2,7 +2,7 @@
   "name": "Glowup Store",
   "short_name": "Glowup",
   "description": "Gestión de inventario, clientes, ventas y cuentas",
-  "start_url": "/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8f9ff",
   "theme_color": "#2a14b4",
