@@ -167,6 +167,10 @@ tailwind.config = {
   input[type="search"]::-webkit-search-results-decoration {
     -webkit-appearance: none;
   }
+  header { padding-top: constant(safe-area-inset-top); padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: constant(safe-area-inset-bottom); padding-bottom: env(safe-area-inset-bottom); }
+  #fab-add { bottom: calc(4rem + env(safe-area-inset-bottom) + 1rem); }
+  #toast { bottom: calc(4rem + env(safe-area-inset-bottom) + 1.5rem); }
   @media (max-width: 480px) {
     .bento-grid { gap: 12px; }
   }
@@ -175,7 +179,7 @@ tailwind.config = {
 <body class="font-body-md text-on-surface">
 
 <!-- Top App Bar -->
-<header class="bg-surface/80 backdrop-blur-xl w-full sticky top-0 z-50 border-b border-outline-variant/30 flex justify-between items-center px-margin-mobile h-[60px]">
+<header class="bg-surface/80 backdrop-blur-xl w-full sticky top-0 z-50 border-b border-outline-variant/30 flex justify-between items-center px-margin-mobile min-h-[60px]">
   <div class="flex items-center gap-3">
     <h1 class="font-headline-md text-xl font-bold tracking-tight text-on-surface">Glowup Store</h1>
   </div>
