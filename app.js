@@ -59,6 +59,7 @@ function showConfirm(msg) {
 
 // ─── NAVIGATION ───
 function navigate(page) {
+  console.log('navigate called with:', page);
   const navPage = page === 'cobrar' || page === 'pagar' ? 'finanzas' : page;
   currentPage = navPage;
   document.querySelectorAll('.nav-item').forEach(el => {
@@ -80,7 +81,8 @@ function navigate(page) {
     ventas: 'Ventas', cobrar: 'Cuentas por cobrar', pagar: 'Cuentas por pagar',
     finanzas: 'Finanzas',
   };
-  document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+  const pt = document.getElementById('page-title');
+  if (pt) pt.textContent = titles[page] || 'Dashboard';
   // Sync the finanzas tab state when navigating directly to cobrar/pagar
   const ftabEl = document.getElementById('ftab-state');
   if (ftabEl && (page === 'cobrar' || page === 'pagar')) ftabEl.dataset.ftab = page;
@@ -107,6 +109,7 @@ function renderDashboard() {
   const cobrar = DB.get('cobrar');
   const pagar = DB.get('pagar');
   const productos = DB.get('productos');
+  const clientes = DB.get('clientes');
   const mes = today().slice(0, 7);
   const ventasMes = ventas.filter(v => v.fecha?.startsWith(mes));
   const totalMes = ventasMes.reduce((s, v) => s + (+v.total || 0), 0);
@@ -114,94 +117,136 @@ function renderDashboard() {
   const totalPagar = pagar.filter(p => p.estado !== 'Pagado').reduce((s, p) => s + (+p.monto || 0), 0);
   const stockBajo = productos.filter(p => p.stock !== '' && p.stockMin !== '' && +p.stock <= +p.stockMin);
   const recent = [...ventas].sort((a, b) => b.fecha?.localeCompare(a.fecha)).slice(0, 5);
+  const totalStock = productos.reduce((s, p) => s + (+p.stock || 0), 0);
+  const totalClientes = clientes.length;
 
-  const totalCobrarPct = totalCobrar + totalPagar > 0 ? (totalCobrar / (totalCobrar + totalPagar)) * 100 : 70;
-  const totalPagarPct = 100 - totalCobrarPct;
+  // Trend vs last month
+  const mesAnt = new Date(); mesAnt.setMonth(mesAnt.getMonth() - 1);
+  const mesAntStr = mesAnt.toISOString().slice(0, 7);
+  const totalMesAnt = ventas.filter(v => v.fecha?.startsWith(mesAntStr)).reduce((s, v) => s + (+v.total || 0), 0);
+  const trendPct = totalMesAnt > 0 ? Math.round(((totalMes - totalMesAnt) / totalMesAnt) * 100) : 0;
 
   document.getElementById('content').innerHTML = `
-    <section class="space-y-1">
-      <h2 class="font-headline-lg text-headline-lg text-on-surface">Dashboard</h2>
-      <p class="font-body-md text-on-surface-variant opacity-80">Resumen de tu negocio</p>
+    <section class="mb-xl">
+      <h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Hola, Glowup Store</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant">As\u00ED va tu negocio hoy.</p>
     </section>
 
-    <div class="bento-grid">
-      <div class="col-span-2 glass-card rounded-xl p-5 flex flex-col justify-between min-h-[160px]">
-        <div class="flex justify-between items-start">
-          <span class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">VENTAS DEL MES</span>
-          <div class="w-10 h-10 bg-primary/5 rounded-full flex items-center justify-center text-primary">
-            <span class="material-symbols-outlined">payments</span>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-md">
+      <div class="md:col-span-2 glass-card rounded-xl p-md flex flex-col justify-between overflow-hidden relative custom-shadow">
+        <div class="relative z-10">
+          <div class="flex justify-between items-start mb-md">
+            <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">VENTAS DEL MES</span>
+            <div class="bg-success-bg text-success px-sm py-xs rounded-full flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">trending_up</span>
+              <span class="font-label-sm text-label-sm">${trendPct >= 0 ? '+' : ''}${trendPct}%</span>
+            </div>
+          </div>
+          <div class="mb-lg">
+            <span class="font-display text-display text-primary">${fmtMoney(totalMes)}</span>
+          </div>
+          <div class="flex gap-sm">
+            <div class="h-1 flex-1 bg-primary rounded-full"></div>
+            <div class="h-1 flex-1 bg-primary/40 rounded-full"></div>
+            <div class="h-1 flex-1 bg-primary/20 rounded-full"></div>
+            <div class="h-1 flex-1 bg-primary/10 rounded-full"></div>
           </div>
         </div>
-        <div>
-          <div class="text-[36px] font-bold text-primary tracking-tight">${fmtMoney(totalMes)}</div>
-          <div class="flex items-center gap-1.5 text-on-tertiary-fixed-variant font-medium mt-1">
-            <span class="material-symbols-outlined text-sm">trending_up</span>
-            <span class="text-sm">${ventasMes.length} transacciones</span>
+        <div class="absolute -right-8 -bottom-8 opacity-5">
+          <span class="material-symbols-outlined text-[160px]">payments</span>
+        </div>
+      </div>
+
+      <div class="md:col-span-1 glass-card rounded-xl p-md custom-shadow ${stockBajo.length > 0 ? 'border border-tertiary/20' : ''}">
+        <div class="flex items-center gap-sm mb-md ${stockBajo.length > 0 ? 'text-tertiary' : 'text-on-surface-variant'}">
+          <span class="material-symbols-outlined">warning</span>
+          <span class="font-label-md text-label-md font-bold">Stock Bajo</span>
+        </div>
+        ${stockBajo.length === 0
+          ? '<p class="text-sm text-on-surface-variant text-center py-4">Todo en orden</p>'
+          : `<div class="space-y-md">${stockBajo.slice(0, 3).map(p => `
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="font-label-md text-label-md text-on-surface">${esc(p.nombre)}</p>
+                <p class="font-label-sm text-label-sm text-tertiary">Solo ${esc(p.stock)} unidades</p>
+              </div>
+              <button class="text-primary font-label-sm text-label-sm underline" data-nav="inventario">Reabastecer</button>
+            </div>
+          `).join('')}${stockBajo.length > 3 ? `<p class="text-xs text-on-surface-variant text-center pt-2">+${stockBajo.length - 3} m\u00E1s</p>` : ''}</div>`
+        }
+      </div>
+
+      <div class="md:col-span-1 glass-card rounded-xl p-md bg-primary/10 custom-shadow">
+        <div class="flex items-center gap-sm mb-sm text-primary">
+          <span class="material-symbols-outlined">lightbulb</span>
+          <span class="font-label-md text-label-md font-bold">Resumen</span>
+        </div>
+        <p class="font-body-md text-body-md italic mb-md text-on-surface">
+          ${totalCobrar > 0 || totalPagar > 0
+            ? `Tienes <strong>${fmtMoney(totalCobrar)}</strong> por cobrar y <strong>${fmtMoney(totalPagar)}</strong> por pagar.`
+            : 'Sin cuentas pendientes. \u00A1Todo al d\u00EDa!'}
+        </p>
+      </div>
+
+      <div class="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-md mt-sm">
+        <button class="flex flex-col items-center justify-center p-md bg-white border border-outline-variant rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95 group custom-shadow" data-nav="ventas">
+          <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-sm group-hover:bg-primary group-hover:text-white transition-colors">
+            <span class="material-symbols-outlined">add_shopping_cart</span>
+          </div>
+          <span class="font-label-md text-label-md">Nueva Venta</span>
+        </button>
+        <button class="flex flex-col items-center justify-center p-md bg-white border border-outline-variant rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95 group custom-shadow" data-nav="clientes">
+          <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-sm group-hover:bg-primary group-hover:text-white transition-colors">
+            <span class="material-symbols-outlined">person_add</span>
+          </div>
+          <span class="font-label-md text-label-md">Clientes</span>
+        </button>
+        <button class="flex flex-col items-center justify-center p-md bg-white border border-outline-variant rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95 group custom-shadow" data-nav="finanzas">
+          <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-sm group-hover:bg-primary group-hover:text-white transition-colors">
+            <span class="material-symbols-outlined">receipt_long</span>
+          </div>
+          <span class="font-label-md text-label-md">Finanzas</span>
+        </button>
+        <button class="flex flex-col items-center justify-center p-md bg-white border border-outline-variant rounded-xl hover:border-primary hover:text-primary transition-all active:scale-95 group custom-shadow" data-nav="inventario">
+          <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-sm group-hover:bg-primary group-hover:text-white transition-colors">
+            <span class="material-symbols-outlined">analytics</span>
+          </div>
+          <span class="font-label-md text-label-md">Inventario</span>
+        </button>
+      </div>
+
+      <div class="md:col-span-3 glass-card rounded-xl p-md custom-shadow">
+        <div class="flex justify-between items-center mb-lg">
+          <h3 class="font-headline-md text-headline-md text-on-surface">\u00DAltimas Ventas</h3>
+          <button class="text-primary font-label-md text-label-md" data-nav="ventas">Ver Todo</button>
+        </div>
+        ${recent.length === 0
+          ? '<p class="text-sm text-on-surface-variant text-center py-4">Sin ventas registradas</p>'
+          : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-outline-variant text-on-surface-variant font-label-sm text-label-sm"><th class="pb-sm px-sm">FECHA</th><th class="pb-sm px-sm">CLIENTE</th><th class="pb-sm px-sm">PAGO</th><th class="pb-sm px-sm text-right">TOTAL</th></tr></thead><tbody class="font-body-md text-body-md">${recent.map(v => `
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+              <td class="py-md px-sm">${fmtDate(v.fecha)}</td>
+              <td class="py-md px-sm">${v.cliente ? esc(v.cliente) : '\u2014'}</td>
+              <td class="py-md px-sm"><span class="${v.pago === 'Cr\u00E9dito' ? 'bg-warning-bg text-warning' : 'bg-success-bg text-success'} px-sm py-1 rounded-full text-xs font-bold uppercase">${esc(v.pago || 'Contado')}</span></td>
+              <td class="py-md px-sm text-right font-bold text-on-surface">${fmtMoney(v.total)}</td>
+            </tr>
+          `).join('')}</tbody></table></div>`
+        }
+      </div>
+
+      <div class="md:col-span-1 flex flex-col gap-md">
+        <div class="flex-1 glass-card rounded-xl p-md custom-shadow flex flex-col justify-center items-center text-center">
+          <span class="font-label-md text-label-md text-on-surface-variant mb-base">Productos</span>
+          <span class="font-headline-lg text-headline-lg text-on-surface">${totalStock}</span>
+          <div class="w-full h-2 bg-surface-container rounded-full mt-md overflow-hidden">
+            <div class="h-full bg-secondary w-3/4 rounded-full"></div>
           </div>
         </div>
-      </div>
-      <div class="glass-card rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-        <div class="flex justify-between items-start">
-          <span class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">STOCK BAJO</span>
-          <span class="material-symbols-outlined text-error">inventory_2</span>
-        </div>
-        <div>
-          <div class="font-headline-md text-headline-md text-error">${stockBajo.length} Items</div>
-          <p class="text-xs text-on-surface-variant mt-1 font-medium">Requieren atención</p>
-        </div>
-      </div>
-      <div class="glass-card rounded-xl p-5 flex flex-col justify-between min-h-[140px]">
-        <div class="flex justify-between items-start">
-          <span class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">POR COBRAR</span>
-          <span class="material-symbols-outlined text-primary">receipt_long</span>
-        </div>
-        <div>
-          <div class="font-headline-md text-headline-md">${fmtMoney(totalCobrar)}</div>
-          <p class="text-xs text-on-surface-variant mt-1 font-medium">${cobrar.filter(c => c.estado !== 'Pagado').length} pendientes</p>
+        <div class="flex-1 glass-card rounded-xl p-md custom-shadow flex flex-col justify-center items-center text-center">
+          <span class="font-label-md text-label-md text-on-surface-variant mb-base">Clientes</span>
+          <span class="font-headline-lg text-headline-lg text-on-surface">${totalClientes}</span>
         </div>
       </div>
     </div>
-
-    <section class="glass-card rounded-xl p-5 space-y-5">
-      <div class="flex justify-between items-center">
-        <h3 class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">CUENTAS OVERVIEW</h3>
-        <span class="material-symbols-outlined text-on-surface-variant opacity-40">more_horiz</span>
-      </div>
-      <div class="flex items-center justify-between">
-        <div class="flex-1 space-y-1">
-          <p class="text-[11px] font-bold text-on-surface-variant/60 uppercase">POR COBRAR</p>
-          <p class="text-xl font-bold text-on-tertiary-fixed-variant">${fmtMoney(totalCobrar)}</p>
-        </div>
-        <div class="w-px h-10 bg-outline-variant/30 mx-4"></div>
-        <div class="flex-1 space-y-1 text-right">
-          <p class="text-[11px] font-bold text-on-surface-variant/60 uppercase">POR PAGAR</p>
-          <p class="text-xl font-bold text-error">${fmtMoney(totalPagar)}</p>
-        </div>
-      </div>
-      <div class="w-full bg-surface-container-high/50 rounded-full h-2.5 flex overflow-hidden p-0.5 border border-white/40">
-        <div class="bg-primary h-full rounded-full" style="width:${Math.round(totalCobrarPct)}%"></div>
-        <div class="bg-error h-full rounded-full ml-1" style="width:${Math.round(totalPagarPct)}%"></div>
-      </div>
-    </section>
-
-    <section class="glass-card rounded-xl p-5">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">ÚLTIMAS VENTAS</h3>
-        <button class="text-[11px] font-bold text-primary px-3 py-1 bg-primary/5 rounded-full" data-nav="ventas">VER TODO</button>
-      </div>
-      ${recent.length === 0
-        ? '<p class="text-sm text-on-surface-variant text-center py-4">Sin ventas registradas</p>'
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="pb-3 font-bold">Fecha</th><th class="pb-3 font-bold">Total</th><th class="pb-3 font-bold">Pago</th></tr></thead><tbody>${recent.map(v => `<tr class="border-t border-outline-variant/20"><td class="py-2.5 text-sm">${fmtDate(v.fecha)}</td><td class="py-2.5 font-bold">${fmtMoney(v.total)}</td><td class="py-2.5"><span class="inline-block text-[11px] px-2.5 py-1 rounded-full font-bold ${v.pago === 'Crédito' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}">${esc(v.pago)}</span></td></tr>`).join('')}</tbody></table>`}
-    </section>
-
-    ${stockBajo.length > 0 ? `
-    <section class="glass-card rounded-xl p-5">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="font-label-md text-label-md uppercase text-on-surface-variant tracking-widest opacity-60">⚠️ STOCK BAJO</h3>
-        <button class="text-[11px] font-bold text-primary px-3 py-1 bg-primary/5 rounded-full" data-nav="inventario">VER TODO</button>
-      </div>
-      <table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="pb-3 font-bold">Producto</th><th class="pb-3 font-bold">Stock</th><th class="pb-3 font-bold">Mínimo</th></tr></thead><tbody>${stockBajo.map(p => `<tr class="border-t border-outline-variant/20"><td class="py-2.5 font-medium">${esc(p.nombre)}</td><td class="py-2.5 text-error font-bold">${esc(p.stock)}</td><td class="py-2.5">${esc(p.stockMin)}</td></tr>`).join('')}</tbody></table>
-    </section>` : ''}
   `;
 }
 
@@ -211,49 +256,81 @@ function renderDashboard() {
 function renderInventario() {
   const productos = DB.get('productos');
   const q = (document.getElementById('inv-search')?.value || '').toLowerCase();
-  const cat = document.getElementById('inv-cat')?.value || '';
-  const filtered = productos.filter(p =>
-    (!q || p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q)) &&
-    (!cat || p.categoria === cat)
-  );
+  const filtro = document.getElementById('inv-filter-state')?.dataset.filter || 'todos';
 
-  document.getElementById('content').innerHTML = `
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-headline-md font-headline-md" style="font-size:20px;line-height:28px;font-weight:600;">Inventario</h2>
-      <button class="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium transition-all active:scale-95" data-modal="modal-producto" data-new="producto">
-        <span class="material-symbols-outlined text-lg">add</span>
-        Nuevo
-      </button>
-    </div>
+  let filtered = [...productos];
+  if (q) filtered = filtered.filter(p => p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q));
+  if (filtro === 'low') filtered = filtered.filter(p => +p.stock > 0 && +p.stock <= +p.stockMin);
+  else if (filtro === 'out') filtered = filtered.filter(p => !p.stock || +p.stock === 0);
+  else if (filtro === 'asc') filtered.sort((a, b) => (+a.venta || 0) - (+b.venta || 0));
+  else if (filtro.startsWith('cat:')) filtered = filtered.filter(p => p.categoria === filtro.slice(4));
 
-    <div class="flex gap-2 mb-4 flex-wrap">
-      <div class="relative flex-1 min-w-[180px]">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-        <input type="search" id="inv-search" placeholder="Buscar producto..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20" value="${esc(q)}">
-      </div>
-      <select id="inv-cat" class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 min-w-[140px]">
-        <option value="">Todas</option>
-        <option value="Uniformes médicos" ${cat === 'Uniformes médicos' ? 'selected' : ''}>Uniformes médicos</option>
-        <option value="Maquillaje" ${cat === 'Maquillaje' ? 'selected' : ''}>Maquillaje</option>
-        <option value="Accesorios" ${cat === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
-        <option value="Otro" ${cat === 'Otro' ? 'selected' : ''}>Otro</option>
-      </select>
-    </div>
+  const cats = [...new Set(productos.map(p => p.categoria).filter(Boolean))];
 
-    <div class="glass-card-solid rounded-xl overflow-hidden">
-      ${filtered.length === 0
-        ? `<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">inventory_2</span><p>${productos.length === 0 ? 'Sin productos aún' : 'Sin resultados'}</p></div>`
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="px-4 py-3 font-bold">Producto</th><th class="px-4 py-3 font-bold">Categoría</th><th class="px-4 py-3 font-bold">Costo</th><th class="px-4 py-3 font-bold">Venta</th><th class="px-4 py-3 font-bold">Stock</th><th class="px-4 py-3"></th></tr></thead><tbody>${filtered.map(p => {
-          const low = p.stock !== '' && p.stockMin !== '' && +p.stock <= +p.stockMin;
-          return `<tr class="border-t border-outline-variant/20 hover:bg-primary/5 transition-colors"><td class="px-4 py-3"><div class="flex items-center gap-2">${low ? '<span class="w-2 h-2 rounded-full bg-error shrink-0"></span>' : ''}<div><span class="font-medium">${esc(p.nombre)}</span>${p.descripcion ? `<br><span class="text-on-surface-variant text-[12px]">${esc(p.descripcion)}</span>` : ''}</div></div></td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-primary/10 text-primary">${esc(p.categoria)}</span></td><td class="px-4 py-3">${fmtMoney(p.costo)}</td><td class="px-4 py-3 font-semibold">${fmtMoney(p.venta)}</td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${low ? 'bg-error/10 text-error' : 'bg-green-50 text-green-700'}">${esc(p.stock)}</span></td><td class="px-4 py-3"><div class="flex gap-1"><button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="producto" data-id="${p.id}"><span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button><button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="producto" data-id="${p.id}"><span class="material-symbols-outlined text-lg text-error">delete</span></button></div></td></tr>`;
-        }).join('')}</tbody></table>`}
-    </div>
-    <p class="text-xs text-on-surface-variant mt-2">${filtered.length} producto(s)</p>
-  `;
+  function chip(label, val) {
+    return '<button class="px-md py-sm rounded-full font-label-md whitespace-nowrap active:scale-95 transition-transform ' +
+      (filtro === val ? 'bg-primary-container text-on-primary-container' : 'bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low') +
+      '" data-filter="' + val + '">' + label + '</button>';
+  }
 
-  // Hook up debounced search
+  function card(p) {
+    const stock = +p.stock || 0;
+    const min = +p.stockMin || 0;
+    const low = stock > 0 && stock <= min;
+    const out = stock === 0;
+    const badgeClass = out ? 'bg-error/10 text-error' : low ? 'bg-warning-bg text-warning' : 'bg-success-bg text-success';
+    const badgeText = out ? 'Sin Stock' : low ? 'Stock Bajo' : 'En Stock';
+    const badgeCount = out ? '' : ' (' + stock + ')';
+    const iconMap = { 'Uniformes m\u00E9dicos': 'medical_services', Maquillaje: 'palette', Accesorios: 'watch' };
+    const icon = iconMap[p.categoria] || 'inventory_2';
+    const iconBg = out ? 'bg-gray-100' : low ? 'bg-warning-bg' : 'bg-success-bg';
+    const iconColor = out ? 'text-gray-400' : low ? 'text-warning' : 'text-success';
+    return '<div class="group bg-surface border border-outline-variant rounded-xl p-md flex items-center gap-md hover:shadow-md transition-all cursor-pointer' + (out ? ' opacity-80' : '') + '">' +
+      '<div class="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ' + iconBg + '">' +
+        '<span class="material-symbols-outlined ' + iconColor + '">' + icon + '</span>' +
+      '</div>' +
+      '<div class="flex-grow min-w-0">' +
+        '<div class="flex justify-between items-start">' +
+          '<h3 class="font-body-md font-semibold text-on-surface truncate">' + esc(p.nombre) + '</h3>' +
+          '<span class="font-label-md text-primary">' + fmtMoney(p.venta) + '</span>' +
+        '</div>' +
+        '<div class="flex items-center gap-sm mt-xs">' +
+          '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + badgeClass + '">' + badgeText + badgeCount + '</span>' +
+          '<span class="text-on-surface-variant text-[11px]">' + esc(p.categoria) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex gap-1 shrink-0">' +
+        '<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="producto" data-id="' + p.id + '">' +
+          '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
+        '<button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="producto" data-id="' + p.id + '">' +
+          '<span class="material-symbols-outlined text-lg text-error">delete</span></button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  document.getElementById('content').innerHTML =
+    '<section class="mb-lg space-y-md">' +
+      '<div class="relative w-full">' +
+        '<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>' +
+        '<input id="inv-search" class="w-full h-12 pl-12 pr-4 rounded-xl border border-outline-variant bg-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-body-md transition-all" placeholder="Buscar productos..." type="text" value="' + esc(q) + '">' +
+      '</div>' +
+      '<div class="flex gap-sm overflow-x-auto pb-1" style="scrollbar-width:none;-ms-overflow-style:none;">' +
+        chip('Todos', 'todos') +
+        chip('Stock Bajo', 'low') +
+        chip('Sin Stock', 'out') +
+        chip('Precio: \u2191', 'asc') +
+        cats.map(function(c) { return chip(esc(c), 'cat:' + c); }).join('') +
+      '</div>' +
+    '</section>' +
+    '<section class="space-y-sm">' +
+      (filtered.length === 0
+        ? '<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">inventory_2</span><p>' + (productos.length === 0 ? 'Sin productos a\u00FAn' : 'Sin resultados') + '</p></div>'
+        : filtered.map(card).join('')
+      ) +
+    '</section>' +
+    '<p class="text-xs text-on-surface-variant mt-2">' + filtered.length + ' producto(s)</p>';
+
   document.getElementById('inv-search')?.addEventListener('input', debounce(renderInventario, 250));
-  document.getElementById('inv-cat')?.addEventListener('change', renderInventario);
 }
 
 function openProductoForm(id) {
@@ -311,29 +388,88 @@ async function deleteProducto(id) {
 //  CLIENTES
 // ══════════════════════════════════════
 function renderClientes() {
-  const clientes = DB.get('clientes');
-  const q = (document.getElementById('cli-search')?.value || '').toLowerCase();
-  const filtered = clientes.filter(c => !q || c.nombre.toLowerCase().includes(q) || (c.cedula || '').includes(q) || (c.telefono || '').includes(q));
+  var clientes = DB.get('clientes');
+  var cobrar = DB.get('cobrar');
+  var mes = today().slice(0, 7);
+  var totalDeuda = cobrar.filter(function(c) { return c.estado !== 'Pagado'; }).reduce(function(s, c) { return s + (+c.monto || 0); }, 0);
+  var nuevosMes = clientes.filter(function(c) { return c.creado && c.creado.startsWith(mes); }).length;
 
-  document.getElementById('content').innerHTML = `
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-headline-md font-headline-md" style="font-size:20px;line-height:28px;font-weight:600;">Clientes</h2>
-      <button class="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium transition-all active:scale-95" data-modal="modal-cliente" data-new="cliente">
-        <span class="material-symbols-outlined text-lg">add</span>
-        Nuevo
-      </button>
-    </div>
-    <div class="relative mb-4">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-      <input type="search" id="cli-search" placeholder="Buscar por nombre, cédula o teléfono..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20" value="${esc(q)}">
-    </div>
-    <div class="glass-card-solid rounded-xl overflow-hidden">
-      ${filtered.length === 0
-        ? `<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">group</span><p>${clientes.length === 0 ? 'Sin clientes aún' : 'Sin resultados'}</p></div>`
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="px-4 py-3 font-bold">Nombre</th><th class="px-4 py-3 font-bold">Cédula</th><th class="px-4 py-3 font-bold">Teléfono</th><th class="px-4 py-3 font-bold">Email</th><th class="px-4 py-3"></th></tr></thead><tbody>${filtered.map(c => `<tr class="border-t border-outline-variant/20 hover:bg-primary/5 transition-colors"><td class="px-4 py-3"><div><span class="font-medium">${esc(c.nombre)}</span>${c.notas ? `<br><span class="text-on-surface-variant text-[12px]">${esc(c.notas)}</span>` : ''}</div></td><td class="px-4 py-3">${c.cedula ? esc(c.cedula) : '—'}</td><td class="px-4 py-3">${c.telefono ? `<a href="tel:${esc(c.telefono)}" class="text-primary font-medium">${esc(c.telefono)}</a>` : '—'}</td><td class="px-4 py-3">${c.email ? esc(c.email) : '—'}</td><td class="px-4 py-3"><div class="flex gap-1"><button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="${c.id}"><span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button><button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="cliente" data-id="${c.id}"><span class="material-symbols-outlined text-lg text-error">delete</span></button></div></td></tr>`).join('')}</tbody></table>`}
-    </div>
-    <p class="text-xs text-on-surface-variant mt-2">${filtered.length} cliente(s)</p>
-  `;
+  var deudas = {};
+  cobrar.filter(function(c) { return c.estado !== 'Pagado'; }).forEach(function(c) {
+    deudas[c.clienteId] = (deudas[c.clienteId] || 0) + (+c.monto || 0);
+  });
+
+  var q = (document.getElementById('cli-search') ? document.getElementById('cli-search').value : '').toLowerCase();
+  var filtered = clientes.filter(function(c) { return !q || c.nombre.toLowerCase().includes(q) || (c.cedula || '').includes(q) || (c.telefono || '').includes(q); });
+
+  function customerItem(c, idx) {
+    var deuda = deudas[c.id] || 0;
+    var hasDeuda = deuda > 0;
+    return '<div class="flex items-center justify-between p-md border-b border-outline-variant hover:bg-surface-container-low transition-colors cursor-pointer group">' +
+      '<div class="flex items-center gap-md">' +
+        '<div class="w-12 h-12 rounded-full ' + avatarColors[idx % avatarColors.length] + ' flex items-center justify-center font-bold text-sm shrink-0">' + initials(c.nombre) + '</div>' +
+        '<div>' +
+          '<p class="font-headline-md text-body-lg font-semibold text-on-surface">' + esc(c.nombre) + '</p>' +
+          '<p class="font-label-sm text-on-surface-variant flex items-center gap-xs">' +
+            (c.telefono ? '<span class="material-symbols-outlined text-[14px]">call</span>' + esc(c.telefono) : '') +
+          '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex items-center gap-2">' +
+        '<div class="text-right">' +
+          '<p class="font-headline-md ' + (hasDeuda ? 'text-error' : 'text-secondary') + '">' + (hasDeuda ? fmtMoney(deuda) : fmtMoney(0)) + '</p>' +
+          '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + (hasDeuda ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container') + '">' + (hasDeuda ? 'Debe' : 'Al d\u00EDa') + '</span>' +
+        '</div>' +
+        '<div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+          '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="' + c.id + '">' +
+            '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
+          '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="cliente" data-id="' + c.id + '">' +
+            '<span class="material-symbols-outlined text-lg text-error">delete</span></button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  document.getElementById('content').innerHTML =
+    '<section class="mb-lg">' +
+      '<div class="relative group">' +
+        '<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">' +
+          '<span class="material-symbols-outlined text-outline group-focus-within:text-primary transition-colors">search</span></div>' +
+        '<input id="cli-search" class="block w-full pl-10 pr-3 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary font-body-md text-on-surface placeholder:text-outline-variant transition-all outline-none" placeholder="Buscar por nombre, c\u00E9dula o tel\u00E9fono..." type="text" value="' + esc(q) + '">' +
+      '</div>' +
+    '</section>' +
+
+    '<section class="grid grid-cols-1 md:grid-cols-2 gap-md mb-lg">' +
+      '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-md flex items-center gap-md transition-all hover:border-primary/30">' +
+        '<div class="w-12 h-12 rounded-full bg-error-container/20 flex items-center justify-center text-error">' +
+          '<span class="material-symbols-outlined" style="font-variation-settings: \'FILL\' 1;">payments</span></div>' +
+        '<div>' +
+          '<p class="font-label-sm text-on-surface-variant uppercase tracking-wider">Total Pendiente</p>' +
+          '<p class="font-headline-md text-error">' + fmtMoney(totalDeuda) + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-md flex items-center gap-md transition-all hover:border-primary/30">' +
+        '<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center text-primary">' +
+          '<span class="material-symbols-outlined" style="font-variation-settings: \'FILL\' 1;">group_add</span></div>' +
+        '<div>' +
+          '<p class="font-label-sm text-on-surface-variant uppercase tracking-wider">Nuevos Este Mes</p>' +
+          '<p class="font-headline-md text-primary">+' + nuevosMes + ' Activo(s)</p>' +
+        '</div>' +
+      '</div>' +
+    '</section>' +
+
+    '<div class="flex justify-between items-center mb-md">' +
+      '<h2 class="font-headline-md text-on-surface">Directorio de Clientes</h2>' +
+      '<span class="text-primary font-label-sm text-label-sm">' + filtered.length + ' cliente(s)</span>' +
+    '</div>' +
+
+    '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">' +
+      (filtered.length === 0
+        ? '<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">group</span><p>' + (clientes.length === 0 ? 'Sin clientes a\u00FAn' : 'Sin resultados') + '</p></div>'
+        : filtered.map(function(c, i) { return customerItem(c, i); }).join('')
+      ) +
+    '</div>';
+
   document.getElementById('cli-search')?.addEventListener('input', debounce(renderClientes, 250));
 }
 
@@ -365,6 +501,7 @@ function saveCliente() {
     direccion: document.getElementById('c-direccion').value.trim(),
     notas: document.getElementById('c-notas').value.trim(),
   };
+  if (!editingId) cliente.creado = today();
   const lista = DB.get('clientes');
   if (editingId) { const i = lista.findIndex(x => x.id === editingId); if (i >= 0) lista[i] = cliente; }
   else { lista.push(cliente); }
@@ -384,29 +521,130 @@ async function deleteCliente(id) {
 // ══════════════════════════════════════
 //  VENTAS
 // ══════════════════════════════════════
-function renderVentas() {
-  const ventas = DB.get('ventas');
-  const q = (document.getElementById('ven-search')?.value || '').toLowerCase();
-  const filtered = [...ventas].sort((a, b) => b.fecha?.localeCompare(a.fecha)).filter(v => !q || (v.clienteNombre || '').toLowerCase().includes(q) || (v.notas || '').toLowerCase().includes(q));
+function initials(name) {
+  if (!name) return 'CF';
+  return name.split(' ').map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+}
+var avatarColors = ['bg-surface-variant text-on-surface-variant', 'bg-primary-fixed text-on-primary-fixed', 'bg-tertiary-fixed text-on-tertiary-fixed', 'bg-secondary-fixed text-on-secondary-fixed'];
 
-  document.getElementById('content').innerHTML = `
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-headline-md font-headline-md" style="font-size:20px;line-height:28px;font-weight:600;">Ventas</h2>
-      <button class="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium transition-all active:scale-95" data-modal="modal-venta" data-new="venta">
-        <span class="material-symbols-outlined text-lg">add</span>
-        Nueva venta
-      </button>
-    </div>
-    <div class="relative mb-4">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-      <input type="search" id="ven-search" placeholder="Buscar venta..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20" value="${esc(q)}">
-    </div>
-    <div class="glass-card-solid rounded-xl overflow-hidden">
-      ${filtered.length === 0
-        ? `<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">payments</span><p>${ventas.length === 0 ? 'Sin ventas aún' : 'Sin resultados'}</p></div>`
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="px-4 py-3 font-bold">Fecha</th><th class="px-4 py-3 font-bold">Cliente</th><th class="px-4 py-3 font-bold">Productos</th><th class="px-4 py-3 font-bold">Total</th><th class="px-4 py-3 font-bold">Pago</th><th class="px-4 py-3"></th></tr></thead><tbody>${filtered.map(v => `<tr class="border-t border-outline-variant/20 hover:bg-primary/5 transition-colors"><td class="px-4 py-3">${fmtDate(v.fecha)}</td><td class="px-4 py-3">${v.clienteNombre ? esc(v.clienteNombre) : 'Consumidor final'}</td><td class="px-4 py-3 text-on-surface-variant text-[12px]">${(v.items || []).map(i => esc(i.nombre)).join(', ') || '—'}</td><td class="px-4 py-3 font-semibold">${fmtMoney(v.total)}</td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${v.pago === 'Crédito' ? 'bg-amber-50 text-amber-700' : v.pago === 'Efectivo' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}">${esc(v.pago)}</span></td><td class="px-4 py-3"><button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="venta" data-id="${v.id}"><span class="material-symbols-outlined text-lg text-error">delete</span></button></td></tr>`).join('')}</tbody></table>`}
-    </div>
-  `;
+function renderVentas() {
+  var ventas = DB.get('ventas');
+  var mes = today().slice(0, 7);
+  var ventasMes = ventas.filter(function(v) { return v.fecha && v.fecha.startsWith(mes); });
+  var totalMes = ventasMes.reduce(function(s, v) { return s + (+v.total || 0); }, 0);
+  var totalTrans = ventasMes.length;
+  var promedio = totalTrans > 0 ? totalMes / totalTrans : 0;
+
+  var d = new Date(); d.setMonth(d.getMonth() - 1);
+  var totalMesAnt = ventas.filter(function(v) { return v.fecha && v.fecha.startsWith(d.toISOString().slice(0, 7)); }).reduce(function(s, v) { return s + (+v.total || 0); }, 0);
+  var trendPct = totalMesAnt > 0 ? Math.round(((totalMes - totalMesAnt) / totalMesAnt) * 100) : 0;
+
+  var dailyTotals = [];
+  for (var i = 6; i >= 0; i--) {
+    var dd = new Date(); dd.setDate(dd.getDate() - i);
+    var ds = dd.toISOString().slice(0, 10);
+    dailyTotals.push(ventas.filter(function(v) { return v.fecha === ds; }).reduce(function(s, v) { return s + (+v.total || 0); }, 0));
+  }
+  var maxDaily = Math.max.apply(null, dailyTotals) || 1;
+  var dayLabels = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
+  var todayIdx = new Date().getDay();
+  var weekLabels = [];
+  for (var i = 0; i < 7; i++) weekLabels.push(dayLabels[(todayIdx - 6 + i + 7) % 7]);
+
+  var q = (document.getElementById('ven-search') ? document.getElementById('ven-search').value : '').toLowerCase();
+  var filtered = [...ventas].sort(function(a, b) { return b.fecha && a.fecha ? b.fecha.localeCompare(a.fecha) : 0; }).filter(function(v) { return !q || (v.clienteNombre || '').toLowerCase().includes(q) || (v.notas || '').toLowerCase().includes(q) || (v.pago || '').toLowerCase().includes(q); });
+
+  function transItem(v, idx) {
+    var pago = v.pago || 'Contado';
+    var completed = pago !== 'Cr\u00E9dito';
+    var amtColor = completed ? 'text-secondary' : 'text-on-surface';
+    var amtSign = completed ? '+' : '';
+    var badgeClass = completed ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant';
+    return '<div class="p-md flex items-center gap-md hover:bg-surface-container transition-colors cursor-pointer group">' +
+      '<div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ' + avatarColors[idx % avatarColors.length] + '">' + initials(v.clienteNombre) + '</div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<div class="flex justify-between items-start">' +
+          '<h4 class="font-body-md text-body-md font-semibold text-on-surface truncate">' + esc(v.clienteNombre || 'Consumidor final') + '</h4>' +
+          '<span class="font-body-md text-body-md font-bold ' + amtColor + '">' + amtSign + fmtMoney(v.total) + '</span>' +
+        '</div>' +
+        '<div class="flex justify-between items-center mt-1">' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant">' + fmtDate(v.fecha) + '</p>' +
+          '<div class="flex items-center gap-1">' +
+            '<span class="px-sm py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ' + badgeClass + '">' + esc(pago) + '</span>' +
+            '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100" data-delete="venta" data-id="' + v.id + '">' +
+              '<span class="material-symbols-outlined text-base text-error">delete</span></button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  document.getElementById('content').innerHTML =
+    '<div class="grid grid-cols-1 md:grid-cols-4 gap-md mb-lg">' +
+      '<div class="md:col-span-2 bg-primary-container text-on-primary p-lg rounded-xl shadow-sm relative overflow-hidden group">' +
+        '<div class="relative z-10">' +
+          '<p class="font-label-md text-label-md opacity-80 mb-base">Total Ventas (Este Mes)</p>' +
+          '<h2 class="font-display text-[32px] md:text-display font-bold mb-md">' + fmtMoney(totalMes) + '</h2>' +
+          '<div class="flex items-center gap-xs text-secondary-fixed">' +
+            '<span class="material-symbols-outlined text-sm">trending_up</span>' +
+            '<span class="font-label-sm text-label-sm">' + (trendPct >= 0 ? '+' : '') + trendPct + '% vs mes anterior</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="absolute -right-12 -top-12 w-48 h-48 bg-white/10 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-125"></div>' +
+      '</div>' +
+      '<div class="bg-surface border border-outline-variant p-md rounded-xl flex items-center gap-md">' +
+        '<div class="w-12 h-12 bg-surface-container flex items-center justify-center rounded-lg">' +
+          '<span class="material-symbols-outlined text-primary">receipt_long</span></div>' +
+        '<div>' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant">Transacciones</p>' +
+          '<p class="font-headline-md text-headline-md text-on-surface">' + totalTrans + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-surface border border-outline-variant p-md rounded-xl flex items-center gap-md">' +
+        '<div class="w-12 h-12 bg-surface-container flex items-center justify-center rounded-lg">' +
+          '<span class="material-symbols-outlined text-primary">analytics</span></div>' +
+        '<div>' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant">Valor Promedio</p>' +
+          '<p class="font-headline-md text-headline-md text-on-surface">' + fmtMoney(promedio) + '</p>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="flex gap-sm mb-lg overflow-x-auto pb-base" style="scrollbar-width:none;">' +
+      '<button class="bg-primary text-on-primary px-lg py-sm rounded-full font-label-md text-label-md flex items-center gap-sm whitespace-nowrap active:scale-95 transition-transform" data-modal="modal-venta" data-new="venta">' +
+        '<span class="material-symbols-outlined text-[20px]">add</span>Nueva Venta</button>' +
+      '<div class="relative flex-1 min-w-0">' +
+        '<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>' +
+        '<input id="ven-search" class="w-full h-[40px] pl-10 pr-3 rounded-full border border-outline-variant bg-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-body-md transition-all" placeholder="Buscar..." type="text" value="' + esc(q) + '">' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="bg-surface border border-outline-variant rounded-xl overflow-hidden mb-xl">' +
+      '<div class="px-md py-md border-b border-outline-variant flex justify-between items-center bg-surface-container-low">' +
+        '<h3 class="font-label-md text-label-md text-on-surface uppercase tracking-wider">Transacciones Recientes</h3>' +
+        '<span class="text-primary font-label-sm text-label-sm">' + filtered.length + ' registro(s)</span>' +
+      '</div>' +
+      '<div class="divide-y divide-outline-variant">' +
+        (filtered.length === 0
+          ? '<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">payments</span><p>' + (ventas.length === 0 ? 'Sin ventas a\u00FAn' : 'Sin resultados') + '</p></div>'
+          : filtered.map(function(v, i) { return transItem(v, i); }).join('')
+        ) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="h-48 w-full bg-surface-container-low rounded-xl border border-outline-variant p-md flex flex-col">' +
+      '<h3 class="font-label-sm text-label-sm text-on-surface-variant mb-md">Distribuci\u00F3n de Ventas (7 d\u00EDas)</h3>' +
+      '<div class="flex-1 flex items-end gap-sm">' +
+        dailyTotals.map(function(t) {
+          var h = Math.round((t / maxDaily) * 100);
+          return '<div class="bg-primary flex-1 rounded-t-sm transition-all duration-500" style="height:' + Math.max(h, 2) + '%"></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="flex justify-between mt-sm">' +
+        weekLabels.map(function(l) { return '<span class="text-[10px] text-on-surface-variant font-medium">' + l + '</span>'; }).join('') +
+      '</div>' +
+    '</div>';
+
   document.getElementById('ven-search')?.addEventListener('input', debounce(renderVentas, 250));
 }
 
@@ -515,85 +753,119 @@ async function deleteVenta(id) {
 //  CUENTAS POR COBRAR
 // ══════════════════════════════════════
 function renderFinanzas() {
-  const ftab = document.getElementById('ftab-state')?.dataset.ftab || 'cobrar';
-  const cobrarSub = document.getElementById('cobrar-tab')?.dataset.tab || 'pendientes';
-  const pagarSub = document.getElementById('pagar-tab')?.dataset.tab || 'pendientes';
-  const cobrar = DB.get('cobrar');
-  const pagar = DB.get('pagar');
-  const cobrarQ = (document.getElementById('cobrar-search')?.value || '').toLowerCase();
-  const pagarQ = (document.getElementById('pagar-search')?.value || '').toLowerCase();
-  const cobrarData = (cobrarSub === 'pendientes' ? cobrar.filter(c => c.estado !== 'Pagado') : cobrar.filter(c => c.estado === 'Pagado'))
-    .filter(c => !cobrarQ || (c.clienteNombre || '').toLowerCase().includes(cobrarQ) || (c.concepto || '').toLowerCase().includes(cobrarQ));
-  const pagarData = (pagarSub === 'pendientes' ? pagar.filter(p => p.estado !== 'Pagado') : pagar.filter(p => p.estado === 'Pagado'))
-    .filter(p => !pagarQ || (p.proveedor || '').toLowerCase().includes(pagarQ) || (p.concepto || '').toLowerCase().includes(pagarQ));
-  const cobrarTotal = cobrarData.reduce((s, c) => s + (+c.monto || 0), 0);
-  const pagarTotal = pagarData.reduce((s, p) => s + (+p.monto || 0), 0);
+  var ftab = document.getElementById('ftab-state')?.dataset.ftab || 'cobrar';
+  var isCobrar = ftab === 'cobrar';
+  var cobrar = DB.get('cobrar');
+  var pagar = DB.get('pagar');
+  var totalCobrar = cobrar.filter(function(c) { return c.estado !== 'Pagado'; }).reduce(function(s, c) { return s + (+c.monto || 0); }, 0);
+  var totalPagar = pagar.filter(function(p) { return p.estado !== 'Pagado'; }).reduce(function(s, p) { return s + (+p.monto || 0); }, 0);
 
-  document.getElementById('content').innerHTML = `
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-headline-md font-headline-md" style="font-size:20px;line-height:28px;font-weight:600;">Finanzas</h2>
-      <div class="flex gap-1 bg-surface-container-low p-1 rounded-xl">
-        <button class="px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${ftab === 'cobrar' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-ftab="cobrar">Por cobrar</button>
-        <button class="px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${ftab === 'pagar' ? 'bg-white shadow-sm text-primary' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-ftab="pagar">Por pagar</button>
-      </div>
-    </div>
+  var subEl = document.getElementById(isCobrar ? 'cobrar-tab' : 'pagar-tab');
+  var sub = (subEl ? subEl.dataset.tab : null) || 'pendientes';
+  var allData = isCobrar ? cobrar : pagar;
+  var filtered = sub === 'pendientes'
+    ? allData.filter(function(x) { return x.estado !== 'Pagado'; })
+    : allData.filter(function(x) { return x.estado === 'Pagado'; });
 
-    ${ftab === 'cobrar' ? `
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-headline-sm font-headline-sm">Cuentas por cobrar</h3>
-      <button class="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium transition-all active:scale-95" data-modal="modal-cobrar" data-new="cobrar">
-        <span class="material-symbols-outlined text-lg">add</span> Nueva
-      </button>
-    </div>
-    <div class="flex gap-2 mb-4 flex-wrap items-center">
-      <div class="flex gap-1 bg-surface-container-low p-1 rounded-xl">
-        <button class="tab-btn px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${cobrarSub === 'pendientes' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-tab="cobrar" data-value="pendientes">Pendientes (${cobrar.filter(c => c.estado !== 'Pagado').length})</button>
-        <button class="tab-btn px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${cobrarSub === 'pagadas' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-tab="cobrar" data-value="pagadas">Cobradas (${cobrar.filter(c => c.estado === 'Pagado').length})</button>
-      </div>
-      <div class="relative flex-1 min-w-[160px]">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-        <input type="search" id="cobrar-search" placeholder="Buscar..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
-      </div>
-    </div>
-    ${cobrarSub === 'pendientes' && cobrarData.length > 0 ? `<div class="bg-primary/5 border border-primary/20 rounded-xl p-3 mb-4 inline-block"><span class="text-label-caps font-label-caps text-on-surface-variant">TOTAL POR COBRAR</span><div class="text-headline-md font-headline-md text-primary" style="font-size:20px;line-height:28px;font-weight:600;">${fmtMoney(cobrarTotal)}</div></div>` : ''}
-    <div class="glass-card-solid rounded-xl overflow-hidden">
-      ${cobrarData.length === 0
-        ? `<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">receipt_long</span><p>${cobrarSub === 'pendientes' ? 'Sin cuentas pendientes' : 'Sin cuentas cobradas'}</p></div>`
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="px-4 py-3 font-bold">Cliente</th><th class="px-4 py-3 font-bold">Concepto</th><th class="px-4 py-3 font-bold">Monto</th><th class="px-4 py-3 font-bold">Vence</th><th class="px-4 py-3 font-bold">Estado</th><th class="px-4 py-3"></th></tr></thead><tbody>${cobrarData.map(c => {
-          const vencido = c.vence && c.vence < today() && c.estado !== 'Pagado';
-          return `<tr class="border-t border-outline-variant/20 hover:bg-primary/5 transition-colors"><td class="px-4 py-3 font-medium">${c.clienteNombre ? esc(c.clienteNombre) : '—'}</td><td class="px-4 py-3 text-on-surface-variant text-[12px]">${c.concepto ? esc(c.concepto) : '—'}</td><td class="px-4 py-3 font-semibold">${fmtMoney(c.monto)}</td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${vencido ? 'bg-error/10 text-error' : c.vence ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}">${fmtDate(c.vence)}</span></td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${c.estado === 'Pagado' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}">${c.estado || 'Pendiente'}</span></td><td class="px-4 py-3"><div class="flex gap-1">${c.estado !== 'Pagado' ? `<button class="px-2.5 py-1 bg-green-50 text-green-700 rounded-lg text-[11px] font-bold hover:bg-green-100 transition-colors" data-action="cobrar" data-id="${c.id}">Cobrar</button>` : ''}<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cobrar" data-id="${c.id}"><span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button><button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="cobrar" data-id="${c.id}"><span class="material-symbols-outlined text-lg text-error">delete</span></button></div></td></tr>`;
-        }).join('')}</tbody></table>`}
-    </div>
-    ` : `
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-headline-sm font-headline-sm">Cuentas por pagar</h3>
-      <button class="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium transition-all active:scale-95" data-modal="modal-pagar" data-new="pagar">
-        <span class="material-symbols-outlined text-lg">add</span> Nueva
-      </button>
-    </div>
-    <div class="flex gap-2 mb-4 flex-wrap items-center">
-      <div class="flex gap-1 bg-surface-container-low p-1 rounded-xl">
-        <button class="tab-btn px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${pagarSub === 'pendientes' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-tab="pagar" data-value="pendientes">Pendientes (${pagar.filter(p => p.estado !== 'Pagado').length})</button>
-        <button class="tab-btn px-3 py-1.5 text-sm rounded-lg font-medium transition-all ${pagarSub === 'pagadas' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60 hover:text-on-surface'}" data-tab="pagar" data-value="pagadas">Pagadas (${pagar.filter(p => p.estado === 'Pagado').length})</button>
-      </div>
-      <div class="relative flex-1 min-w-[160px]">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-        <input type="search" id="pagar-search" placeholder="Buscar..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
-      </div>
-    </div>
-    ${pagarSub === 'pendientes' && pagarData.length > 0 ? `<div class="bg-error/5 border border-error/20 rounded-xl p-3 mb-4 inline-block"><span class="text-label-caps font-label-caps text-on-surface-variant">TOTAL POR PAGAR</span><div class="text-headline-md font-headline-md text-error" style="font-size:20px;line-height:28px;font-weight:600;">${fmtMoney(pagarTotal)}</div></div>` : ''}
-    <div class="glass-card-solid rounded-xl overflow-hidden">
-      ${pagarData.length === 0
-        ? `<div class="text-center py-12 text-on-surface-variant"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">account_balance</span><p>${pagarSub === 'pendientes' ? 'Sin cuentas pendientes' : 'Sin cuentas pagadas'}</p></div>`
-        : `<table class="w-full text-sm"><thead><tr class="text-left text-[11px] text-on-surface-variant/60 uppercase tracking-wider"><th class="px-4 py-3 font-bold">Proveedor</th><th class="px-4 py-3 font-bold">Concepto</th><th class="px-4 py-3 font-bold">Monto</th><th class="px-4 py-3 font-bold">Vence</th><th class="px-4 py-3 font-bold">Estado</th><th class="px-4 py-3"></th></tr></thead><tbody>${pagarData.map(p => {
-          const vencido = p.vence && p.vence < today() && p.estado !== 'Pagado';
-          return `<tr class="border-t border-outline-variant/20 hover:bg-primary/5 transition-colors"><td class="px-4 py-3 font-medium">${p.proveedor ? esc(p.proveedor) : '—'}</td><td class="px-4 py-3 text-on-surface-variant text-[12px]">${p.concepto ? esc(p.concepto) : '—'}</td><td class="px-4 py-3 font-semibold">${fmtMoney(p.monto)}</td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${vencido ? 'bg-error/10 text-error' : p.vence ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}">${fmtDate(p.vence)}</span></td><td class="px-4 py-3"><span class="text-[11px] px-2.5 py-1 rounded-full font-bold ${p.estado === 'Pagado' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}">${p.estado || 'Pendiente'}</span></td><td class="px-4 py-3"><div class="flex gap-1">${p.estado !== 'Pagado' ? `<button class="px-2.5 py-1 bg-green-50 text-green-700 rounded-lg text-[11px] font-bold hover:bg-green-100 transition-colors" data-action="pagar" data-id="${p.id}">Pagar</button>` : ''}<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="pagar" data-id="${p.id}"><span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button><button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="pagar" data-id="${p.id}"><span class="material-symbols-outlined text-lg text-error">delete</span></button></div></td></tr>`;
-        }).join('')}</tbody></table>`}
-    </div>
-    `}
-  `;
-  document.getElementById('cobrar-search')?.addEventListener('input', debounce(renderFinanzas, 250));
-  document.getElementById('pagar-search')?.addEventListener('input', debounce(renderFinanzas, 250));
+  var searchId = isCobrar ? 'cobrar-search' : 'pagar-search';
+  var q = (document.getElementById(searchId) ? document.getElementById(searchId).value : '').toLowerCase();
+  var nameField = isCobrar ? 'clienteNombre' : 'proveedor';
+  filtered = filtered.filter(function(x) {
+    return !q || (x[nameField] || '').toLowerCase().includes(q) || (x.concepto || '').toLowerCase().includes(q);
+  });
+
+  function invoiceCard(item) {
+    var name = item[nameField] || '\u2014';
+    var vencido = item.vence && item.vence < today() && item.estado !== 'Pagado';
+    var isPaid = item.estado === 'Pagado';
+    var statusClass = isPaid ? 'bg-secondary-container text-on-secondary-container' : vencido ? 'bg-error-container text-on-error-container' : 'bg-surface-container-high text-on-surface-variant border border-outline-variant';
+    var statusDot = isPaid ? 'bg-secondary' : vencido ? 'bg-error' : 'bg-outline';
+    var statusText = isPaid ? 'Pagado' : vencido ? 'Vencido' : 'Pendiente';
+    var actionLabel = isCobrar ? 'Cobrar' : 'Pagar';
+    var actionAttr = isCobrar ? 'cobrar' : 'pagar';
+    var concept = item.concepto ? esc(item.concepto) : '';
+    var venceStr = item.vence ? 'Vence: ' + fmtDate(item.vence) : '';
+    var subtitle = concept + (concept && venceStr ? ' \u2022 ' : '') + venceStr;
+    if (!subtitle) subtitle = fmtDate(item.fecha);
+
+    return '<div class="p-md bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col gap-sm">' +
+      '<div class="flex justify-between items-start">' +
+        '<div>' +
+          '<p class="font-headline-md text-headline-md text-on-surface">' + esc(name) + '</p>' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant">' + subtitle + '</p>' +
+        '</div>' +
+        '<div class="px-sm py-xs rounded-full flex items-center gap-xs ' + statusClass + '">' +
+          '<div class="w-1.5 h-1.5 rounded-full ' + statusDot + '"></div>' +
+          '<span class="text-[10px] font-bold uppercase">' + statusText + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex justify-between items-center mt-xs">' +
+        '<p class="font-headline-md text-headline-md text-on-surface">' + fmtMoney(item.monto) + '</p>' +
+        '<div class="flex gap-1">' +
+          (!isPaid
+            ? '<button class="bg-primary-container text-on-primary px-md py-sm rounded-xl font-label-md text-label-md hover:bg-primary active:scale-95 transition-all shadow-sm" data-action="' + actionAttr + '" data-id="' + item.id + '">' +
+                '<span class="material-symbols-outlined text-sm align-middle">check</span> ' + actionLabel + '</button>'
+            : ''
+          ) +
+          '<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="' + actionAttr + '" data-id="' + item.id + '">' +
+            '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
+          '<button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="' + actionAttr + '" data-id="' + item.id + '">' +
+            '<span class="material-symbols-outlined text-lg text-error">delete</span></button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  document.getElementById('content').innerHTML =
+    '<section class="mb-lg">' +
+      '<h2 class="font-headline-md text-headline-md mb-md">Resumen de Flujo</h2>' +
+      '<div class="grid grid-cols-2 gap-md">' +
+        '<div class="p-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Por Cobrar</p>' +
+          '<p class="font-headline-md text-headline-md text-secondary">' + fmtMoney(totalCobrar) + '</p>' +
+        '</div>' +
+        '<div class="p-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">' +
+          '<p class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Por Pagar</p>' +
+          '<p class="font-headline-md text-headline-md text-tertiary">' + fmtMoney(totalPagar) + '</p>' +
+        '</div>' +
+      '</div>' +
+    '</section>' +
+
+    '<div class="mb-lg">' +
+      '<div class="flex p-1 bg-surface-container-high rounded-xl gap-1 mb-3">' +
+        '<button class="flex-1 py-sm px-md rounded-lg font-label-md text-label-md transition-all duration-200 ' + (isCobrar ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant') + '" data-ftab="cobrar">Por Cobrar</button>' +
+        '<button class="flex-1 py-sm px-md rounded-lg font-label-md text-label-md transition-all duration-200 ' + (!isCobrar ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant') + '" data-ftab="pagar">Por Pagar</button>' +
+      '</div>' +
+      '<div class="flex gap-2 mb-3 flex-wrap items-center">' +
+        '<div class="flex gap-1 bg-surface-container-low p-1 rounded-xl">' +
+          '<button class="px-3 py-1.5 text-sm rounded-lg font-medium transition-all ' + (sub === 'pendientes' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60') + '" data-tab="' + (isCobrar ? 'cobrar' : 'pagar') + '" data-value="pendientes">' + (isCobrar ? 'Pendientes' : 'Pendientes') + ' (' + allData.filter(function(x) { return x.estado !== 'Pagado'; }).length + ')</button>' +
+          '<button class="px-3 py-1.5 text-sm rounded-lg font-medium transition-all ' + (sub === 'pagadas' ? 'bg-white shadow-sm' : 'text-on-surface-variant/60') + '" data-tab="' + (isCobrar ? 'cobrar' : 'pagar') + '" data-value="pagadas">' + (isCobrar ? 'Cobradas' : 'Pagadas') + ' (' + allData.filter(function(x) { return x.estado === 'Pagado'; }).length + ')</button>' +
+        '</div>' +
+        '<div class="relative flex-1 min-w-[140px]">' +
+          '<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>' +
+          '<input type="search" id="' + searchId + '" placeholder="Buscar..." class="w-full pl-10 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" value="' + esc(q) + '">' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<section class="space-y-md">' +
+      '<div class="flex justify-between items-center mb-sm">' +
+        '<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">' + (isCobrar ? 'Cuentas por Cobrar' : 'Cuentas por Pagar') + '</h3>' +
+        '<span class="text-primary font-label-md text-label-md">' + filtered.length + ' registro(s)</span>' +
+      '</div>' +
+      (filtered.length === 0
+        ? '<div class="text-center py-12 text-on-surface-variant bg-surface-container-lowest border border-outline-variant rounded-xl"><span class="material-symbols-outlined text-4xl opacity-30 mb-2">' + (isCobrar ? 'receipt_long' : 'account_balance') + '</span><p>' + (allData.length === 0 ? (isCobrar ? 'Sin cuentas por cobrar' : 'Sin cuentas por pagar') : 'Sin resultados') + '</p></div>'
+        : filtered.map(function(item) { return invoiceCard(item); }).join('')
+      ) +
+    '</section>' +
+
+    '<div class="mt-xl h-36 rounded-2xl overflow-hidden shadow-sm bg-gradient-to-r from-primary/80 to-primary/40 flex flex-col justify-center items-center text-white text-center">' +
+      '<p class="font-headline-md text-headline-md">Control Financiero</p>' +
+      '<p class="text-sm text-white/80">Mant\u00E9n tus cuentas al d\u00EDa</p>' +
+    '</div>';
+
+  var searchEl = document.getElementById(searchId);
+  if (searchEl) searchEl.addEventListener('input', debounce(renderFinanzas, 250));
 }
 
 function openCobrarForm(id) {
@@ -757,7 +1029,7 @@ function triggerFab() {
 // ══════════════════════════════════════
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-nav]');
-  if (t) { e.preventDefault(); navigate(t.dataset.nav); return; }
+  if (t) { console.log('nav click:', t.dataset.nav); e.preventDefault(); navigate(t.dataset.nav); return; }
   const fab = e.target.closest('[data-fab]');
   if (fab) { triggerFab(); return; }
   const pg = e.target.closest('[data-page]');
@@ -814,6 +1086,15 @@ document.addEventListener('click', e => {
     const el = document.getElementById('ftab-state');
     if (el) el.dataset.ftab = ftab.dataset.ftab;
     renderFinanzas();
+    return;
+  }
+
+  // Inventory filter chips
+  const invFiltro = e.target.closest('[data-filter]');
+  if (invFiltro) {
+    const el = document.getElementById('inv-filter-state');
+    if (el) el.dataset.filter = invFiltro.dataset.filter;
+    renderInventario();
     return;
   }
 

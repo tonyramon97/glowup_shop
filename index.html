@@ -97,6 +97,7 @@ tailwind.config = {
         "body-sm": ["Inter"],
         "headline-lg-mobile": ["Inter"],
         "label-md": ["Inter"],
+        "label-sm": ["Inter"],
       },
       fontSize: {
         "headline-lg": ["32px", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600" }],
@@ -107,6 +108,7 @@ tailwind.config = {
         "body-sm": ["14px", { lineHeight: "1.5", fontWeight: "400" }],
         "headline-lg-mobile": ["24px", { lineHeight: "1.2", fontWeight: "600" }],
         "label-md": ["12px", { lineHeight: "1", letterSpacing: "0.05em", fontWeight: "600" }],
+        "label-sm": ["12px", { lineHeight: "1", fontWeight: "500" }],
       },
     },
   },
@@ -143,6 +145,9 @@ tailwind.config = {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
+  .custom-shadow {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
   .modal-overlay {
     background: rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(4px);
@@ -175,7 +180,7 @@ tailwind.config = {
     <button id="menu-toggle" class="w-10 h-10 flex items-center justify-center text-primary active:scale-95 transition-transform">
       <span class="material-symbols-outlined">menu</span>
     </button>
-    <h1 id="page-title" class="font-headline-md text-xl font-bold tracking-tight text-on-surface">Dashboard</h1>
+    <h1 class="font-headline-md text-xl font-bold tracking-tight text-on-surface">Glowup Store</h1>
   </div>
   <div class="flex items-center gap-2">
     <button id="btn-export" class="w-10 h-10 flex items-center justify-center text-on-surface-variant active:scale-95 transition-transform" title="Exportar datos">
@@ -497,6 +502,7 @@ tailwind.config = {
 </nav>
 
 <span id="ftab-state" data-ftab="cobrar" class="hidden"></span>
+<span id="inv-filter-state" data-filter="todos" class="hidden"></span>
 
 <script src="app.js"></script>
 </body>
