@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>MiNegocio - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MiNegocio"/>
+<meta name="theme-color" content="#0058be"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        outline: "#76777d",
+        "on-secondary-fixed-variant": "#004395",
+        background: "#f8f9ff",
+        "surface-container-lowest": "#ffffff",
+        "tertiary-fixed": "#6ffbbe",
+        "on-error": "#ffffff",
+        "on-tertiary-container": "#009668",
+        "on-secondary": "#ffffff",
+        "on-primary-container": "#7c839b",
+        "on-secondary-fixed": "#001a42",
+        "surface-bright": "#f8f9ff",
+        "on-surface-variant": "#45464d",
+        "on-error-container": "#93000a",
+        "on-tertiary-fixed": "#002113",
+        tertiary: "#000000",
+        "on-secondary-container": "#fefcff",
+        "inverse-surface": "#213145",
+        "surface-dim": "#cbdbf5",
+        "outline-variant": "#c6c6cd",
+        "inverse-on-surface": "#eaf1ff",
+        "secondary-fixed": "#d8e2ff",
+        "surface-container-low": "#eff4ff",
+        "inverse-primary": "#bec6e0",
+        "surface-container-highest": "#d3e4fe",
+        "on-tertiary-fixed-variant": "#005236",
+        surface: "#f8f9ff",
+        "primary-fixed": "#dae2fd",
+        "surface-tint": "#565e74",
+        "on-primary-fixed-variant": "#3f465c",
+        "on-primary-fixed": "#131b2e",
+        "tertiary-fixed-dim": "#4edea3",
+        "primary-fixed-dim": "#bec6e0",
+        "secondary-container": "#2170e4",
+        "primary-container": "#131b2e",
+        primary: "#000000",
+        "on-background": "#0b1c30",
+        "surface-container-high": "#dce9ff",
+        secondary: "#0058be",
+        "on-primary": "#ffffff",
+        "secondary-fixed-dim": "#adc6ff",
+        "on-tertiary": "#ffffff",
+        "surface-container": "#e5eeff",
+        "on-surface": "#0b1c30",
+        error: "#ba1a1a",
+        "tertiary-container": "#002113",
+        "error-container": "#ffdad6",
+        "surface-variant": "#d3e4fe",
+        "success": "#1e7e34",
+        "success-bg": "#e8f5e9",
+        "warning": "#c97a10",
+        "warning-bg": "#fff8e1",
+      },
+      borderRadius: {
+        DEFAULT: "0.125rem",
+        lg: "0.25rem",
+        xl: "0.5rem",
+        full: "0.75rem",
+      },
+      spacing: {
+        unit: "4px",
+        margin_mobile: "16px",
+        gutter_mobile: "12px",
+        safe_area_bottom: "34px",
+        touch_target_min: "44px",
+      },
+      fontFamily: {
+        "data-tabular": ["JetBrains Mono"],
+        "headline-sm": ["Inter"],
+        display: ["Inter"],
+        "headline-md": ["Inter"],
+        "label-caps": ["Inter"],
+        "body-md": ["Inter"],
+        "body-lg": ["Inter"],
+      },
+      fontSize: {
+        "data-tabular": ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        "headline-sm": ["17px", { lineHeight: "24px", fontWeight: "600" }],
+        display: ["30px", { lineHeight: "36px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+        "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+      },
+    },
+  },
+};
+</script>
+<style>
+  body {
+    background-color: #f8f9ff;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'Inter', sans-serif;
+    min-height: 100dvh;
+    padding-bottom: 80px;
+  }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .modal-overlay {
+    background: rgba(0,0,0,0.45);
+    z-index: 200;
+  }
+  .modal-overlay.hidden { display: none; }
+  .glass-nav {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  #toast {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-results-button,
+  input[type="search"]::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+  }
+</style>
+</head>
+<body class="text-on-surface">
+
+<!-- Top App Bar -->
+<header class="bg-surface/95 glass-nav w-full sticky top-0 z-50 border-b border-outline-variant flex justify-between items-center px-4 h-[52px] relative">
+  <div class="flex items-center gap-3">
+    <button id="menu-toggle" class="text-secondary transition-all active:scale-95 p-1 -ml-1">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+    <h1 id="page-title" class="text-headline-md font-headline-md font-bold">Dashboard</h1>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="btn-export" class="text-on-surface-variant p-2 rounded-full hover:bg-surface-container-low transition-all active:scale-95" title="Exportar datos">
+      <span class="material-symbols-outlined">file_download</span>
+    </button>
+    <button id="btn-import" class="text-on-surface-variant p-2 rounded-full hover:bg-surface-container-low transition-all active:scale-95" title="Importar datos">
+      <span class="material-symbols-outlined">file_upload</span>
+    </button>
+  </div>
+
+  <!-- Settings Menu Dropdown -->
+  <div id="settings-menu" class="hidden absolute top-full right-2 mt-1 bg-white border border-outline-variant rounded-xl shadow-lg z-50 py-1 min-w-[180px]">
+    <button class="w-full text-left px-4 py-2 text-sm hover:bg-surface-container-low transition-all flex items-center gap-2" data-action="export">
+      <span class="material-symbols-outlined text-lg">file_download</span> Exportar datos
+    </button>
+    <button class="w-full text-left px-4 py-2 text-sm hover:bg-surface-container-low transition-all flex items-center gap-2" data-action="import">
+      <span class="material-symbols-outlined text-lg">file_upload</span> Importar datos
+    </button>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="px-4 py-5 max-w-4xl mx-auto" id="content"></main>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Confirm Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-6" id="modal-confirm">
+  <div class="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+    <p id="confirm-msg" class="text-sm text-on-surface"></p>
+    <div class="flex gap-2 justify-end">
+      <button id="confirm-no" class="px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all">Cancelar</button>
+      <button id="confirm-yes" class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Producto Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-4" id="modal-producto">
+  <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-outline-variant">
+      <h3 id="modal-producto-title" class="text-headline-sm font-headline-sm">Nuevo producto</h3>
+      <button class="modal-close p-1.5 rounded-lg hover:bg-surface-container-low transition-all" data-close="modal-producto">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Nombre *</label>
+          <input type="text" id="p-nombre" placeholder="Ej. Pijama quirúrgica azul" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Categoría</label>
+          <select id="p-categoria" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-white">
+            <option value="Uniformes médicos">Uniformes médicos</option>
+            <option value="Maquillaje">Maquillaje</option>
+            <option value="Accesorios">Accesorios</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Precio costo ($)</label>
+          <input type="number" id="p-costo" placeholder="0.00" min="0" step="0.01" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Precio venta ($)</label>
+          <input type="number" id="p-venta" placeholder="0.00" min="0" step="0.01" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Stock actual</label>
+          <input type="number" id="p-stock" placeholder="0" min="0" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Stock mínimo</label>
+          <input type="number" id="p-stock-min" placeholder="5" min="0" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Descripción / Talla</label>
+        <textarea id="p-desc" placeholder="Ej. Talla M, color azul marino..." class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 resize-none min-h-[60px]"></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 p-5 border-t border-outline-variant">
+      <button class="modal-close px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all" data-close="modal-producto">Cancelar</button>
+      <button class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all" onclick="saveProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cliente Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-4" id="modal-cliente">
+  <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-outline-variant">
+      <h3 id="modal-cliente-title" class="text-headline-sm font-headline-sm">Nuevo cliente</h3>
+      <button class="modal-close p-1.5 rounded-lg hover:bg-surface-container-low transition-all" data-close="modal-cliente">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Nombre *</label>
+          <input type="text" id="c-nombre" placeholder="Ej. María González" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Cédula / RUC</label>
+          <input type="text" id="c-cedula" placeholder="0000000000" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Teléfono</label>
+          <input type="tel" id="c-telefono" placeholder="0999999999" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Email</label>
+          <input type="email" id="c-email" placeholder="correo@ejemplo.com" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Dirección</label>
+        <input type="text" id="c-direccion" placeholder="Calle, sector..." class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Notas</label>
+        <textarea id="c-notas" placeholder="Observaciones del cliente..." class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 resize-none min-h-[60px]"></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 p-5 border-t border-outline-variant">
+      <button class="modal-close px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all" data-close="modal-cliente">Cancelar</button>
+      <button class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all" onclick="saveCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Venta Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-4" id="modal-venta">
+  <div class="bg-white rounded-xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-outline-variant">
+      <h3 class="text-headline-sm font-headline-sm">Nueva venta</h3>
+      <button class="modal-close p-1.5 rounded-lg hover:bg-surface-container-low transition-all" data-close="modal-venta">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Cliente</label>
+          <select id="v-cliente" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-white">
+            <option value="">— Consumidor final —</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Fecha</label>
+          <input type="date" id="v-fecha" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Forma de pago</label>
+        <select id="v-pago" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-white">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Tarjeta">Tarjeta</option>
+          <option value="Crédito">Crédito (cuenta por cobrar)</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Productos</label>
+        <button class="flex items-center gap-1 px-3 py-1.5 border border-outline-variant rounded-lg text-sm font-medium hover:bg-surface-container-low transition-all active:scale-95" onclick="addSaleItem()">
+          <span class="material-symbols-outlined text-lg">add</span>
+          Agregar
+        </button>
+      </div>
+      <div id="sale-items">
+        <p class="text-center py-4 text-on-surface-variant text-sm">Agrega al menos un producto</p>
+      </div>
+
+      <div class="border-t border-outline-variant pt-4 flex justify-between items-center">
+        <span class="text-sm text-on-surface-variant">Total</span>
+        <span id="v-total" class="text-display font-display text-secondary" style="font-size:24px;line-height:32px;font-weight:700;">$0.00</span>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Notas</label>
+        <textarea id="v-notas" placeholder="Observaciones de la venta..." class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 resize-none min-h-[60px]"></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 p-5 border-t border-outline-variant">
+      <button class="modal-close px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all" data-close="modal-venta">Cancelar</button>
+      <button class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all" onclick="saveVenta()">Registrar venta</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cuenta por cobrar Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-4" id="modal-cobrar">
+  <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-outline-variant">
+      <h3 id="modal-cobrar-title" class="text-headline-sm font-headline-sm">Nueva cuenta por cobrar</h3>
+      <button class="modal-close p-1.5 rounded-lg hover:bg-surface-container-low transition-all" data-close="modal-cobrar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Cliente *</label>
+          <select id="cc-cliente" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-white">
+            <option value="">Seleccionar...</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Monto ($) *</label>
+          <input type="number" id="cc-monto" placeholder="0.00" min="0" step="0.01" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Fecha emisión</label>
+          <input type="date" id="cc-fecha" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Fecha vencimiento</label>
+          <input type="date" id="cc-vence" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Concepto</label>
+        <input type="text" id="cc-concepto" placeholder="Ej. Venta de uniformes a crédito" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 p-5 border-t border-outline-variant">
+      <button class="modal-close px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all" data-close="modal-cobrar">Cancelar</button>
+      <button class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all" onclick="saveCuentaCobrar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cuenta por pagar Modal -->
+<div class="modal-overlay fixed inset-0 hidden items-center justify-center p-4" id="modal-pagar">
+  <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between p-5 border-b border-outline-variant">
+      <h3 id="modal-pagar-title" class="text-headline-sm font-headline-sm">Nueva cuenta por pagar</h3>
+      <button class="modal-close p-1.5 rounded-lg hover:bg-surface-container-low transition-all" data-close="modal-pagar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Proveedor *</label>
+          <input type="text" id="cp-proveedor" placeholder="Nombre del proveedor" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Monto ($) *</label>
+          <input type="number" id="cp-monto" placeholder="0.00" min="0" step="0.01" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Fecha emisión</label>
+          <input type="date" id="cp-fecha" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-label-caps font-label-caps text-on-surface-variant">Fecha vencimiento</label>
+          <input type="date" id="cp-vence" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+        </div>
+      </div>
+      <div class="space-y-1.5">
+        <label class="text-label-caps font-label-caps text-on-surface-variant">Concepto</label>
+        <input type="text" id="cp-concepto" placeholder="Ej. Compra de pijamas quirúrgicas" class="w-full px-3 py-2 border border-outline-variant rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary/20">
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 p-5 border-t border-outline-variant">
+      <button class="modal-close px-4 py-2 text-sm font-medium rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all" data-close="modal-pagar">Cancelar</button>
+      <button class="px-4 py-2 text-sm font-medium rounded-lg bg-secondary text-white hover:bg-secondary/90 transition-all" onclick="saveCuentaPagar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-28 right-4 px-4 py-3 rounded-xl text-sm font-medium z-[999] transition-all duration-300 pointer-events-none max-w-xs shadow-lg bg-[#1c1b20] text-white"></div>
+
+<!-- Bottom Navigation -->
+<nav class="bg-surface/90 glass-nav fixed bottom-0 w-full z-50 pb-[max(8px,env(safe-area-inset-bottom))] border-t border-outline-variant flex justify-around items-center h-[72px] px-1">
+  <button class="nav-item active flex flex-col items-center justify-center gap-0.5 text-secondary transition-all active:opacity-70 min-w-0 px-1" data-page="dashboard">
+    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">dashboard</span>
+    <span class="text-[10px] font-semibold leading-tight whitespace-nowrap">Dashboard</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center gap-0.5 text-on-surface-variant transition-all active:opacity-70 min-w-0 px-1" data-page="inventario">
+    <span class="material-symbols-outlined">inventory_2</span>
+    <span class="text-[10px] font-semibold leading-tight">Inventario</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center gap-0.5 text-on-surface-variant transition-all active:opacity-70 min-w-0 px-1" data-page="ventas">
+    <span class="material-symbols-outlined">payments</span>
+    <span class="text-[10px] font-semibold leading-tight">Ventas</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center gap-0.5 text-on-surface-variant transition-all active:opacity-70 min-w-0 px-1" data-page="clientes">
+    <span class="material-symbols-outlined">group</span>
+    <span class="text-[10px] font-semibold leading-tight">Clientes</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center gap-0.5 text-on-surface-variant transition-all active:opacity-70 min-w-0 px-1" data-page="cobrar">
+    <span class="material-symbols-outlined">receipt_long</span>
+    <span class="text-[10px] font-semibold leading-tight">Cobrar</span>
+  </button>
+  <button class="nav-item flex flex-col items-center justify-center gap-0.5 text-on-surface-variant transition-all active:opacity-70 min-w-0 px-1" data-page="pagar">
+    <span class="material-symbols-outlined">account_balance</span>
+    <span class="text-[10px] font-semibold leading-tight">Pagar</span>
+  </button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
