@@ -466,6 +466,8 @@ function renderClientes() {
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + (hasDeuda ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container') + '">' + (hasDeuda ? 'Debe' : 'Al d\u00EDa') + '</span>' +
         '</div>' +
         '<div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+          '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="cliente" data-id="' + c.id + '" title="Exportar PDF">' +
+            '<span class="material-symbols-outlined text-lg text-primary">description</span></button>' +
           '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="' + c.id + '">' +
             '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
           '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="cliente" data-id="' + c.id + '">' +
@@ -561,6 +563,170 @@ async function deleteCliente(id) {
   DB.set('clientes', DB.get('clientes').filter(x => x.id !== id));
   toast('Cliente eliminado');
   renderClientes();
+}
+
+function exportClientePDF(id) {
+  if (typeof jspdf === 'undefined') { toast('Error al cargar la librería PDF', 'error'); return; }
+  const clientes = DB.get('clientes');
+  const c = clientes.find(x => x.id === id);
+  if (!c) { toast('Cliente no encontrado', 'error'); return; }
+
+  const ventas = DB.get('ventas').filter(v => v.clienteId === id).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const cobrar = DB.get('cobrar').filter(x => x.clienteId === id);
+  const deudaPendiente = cobrar.filter(x => x.estado !== 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
+  const totalPagado = cobrar.filter(x => x.estado === 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageW = 210;
+  const margin = 15;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  // Colors
+  const primary = [42, 20, 180];
+  const gray = [100, 100, 120];
+  const lightGray = [240, 242, 248];
+
+  // Header bar
+  doc.setFillColor(primary[0], primary[1], primary[2]);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.text('Glowup Store', margin, 18);
+  doc.setFontSize(9);
+  doc.text('Reporte de Cliente', pageW - margin, 18, { align: 'right' });
+
+  y = 38;
+
+  // Client info card
+  doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+  doc.roundedRect(margin, y, contentW, 36, 3, 3, 'F');
+  doc.setTextColor(20, 20, 30);
+  doc.setFontSize(13);
+  doc.setFont(undefined, 'bold');
+  doc.text(c.nombre || 'Sin nombre', margin + 6, y + 9);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  let infoX = margin + 6;
+  let infoY = y + 18;
+  if (c.cedula) { doc.text('Cédula: ' + c.cedula, infoX, infoY); infoX += 60; }
+  if (c.telefono) { doc.text('Tel: ' + c.telefono, infoX, infoY); infoX += 60; }
+  infoX = margin + 6; infoY += 7;
+  if (c.email) { doc.text('Email: ' + c.email, infoX, infoY); infoX += 60; }
+  if (c.direccion) { doc.text('Dir: ' + c.direccion, infoX, infoY); }
+
+  y += 46;
+
+  // Summary cards
+  const cardW = (contentW - 8) / 3;
+  function summaryCard(x, label, value, color) {
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.roundedRect(x, y, cardW, 18, 3, 3, 'F');
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text(label, x + 4, y + 6);
+    doc.setTextColor(20, 20, 30);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(value, x + 4, y + 14);
+  }
+  summaryCard(margin, 'Compras realizadas', '' + ventas.length, [232, 240, 254]);
+  summaryCard(margin + cardW + 4, 'Total pagado', '$' + totalPagado.toFixed(2), [232, 254, 232]);
+  summaryCard(margin + (cardW + 4) * 2, 'Deuda pendiente', '$' + deudaPendiente.toFixed(2), [254, 232, 232]);
+
+  y += 28;
+
+  // Sales table
+  if (ventas.length > 0) {
+    doc.setTextColor(20, 20, 30);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Historial de Compras', margin, y);
+    y += 4;
+
+    const salesRows = ventas.map(v => [
+      v.fecha || '',
+      v.clienteNombre || 'Consumidor final',
+      (v.items || []).map(i => i.nombre + ' x' + i.qty).join(', '),
+      '$' + (+v.total || 0).toFixed(2),
+      v.pago || 'Contado',
+    ]);
+    doc.autoTable({
+      startY: y,
+      head: [['Fecha', 'Cliente', 'Productos', 'Total', 'Pago']],
+      body: salesRows,
+      theme: 'plain',
+      headStyles: { fillColor: primary, fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 'auto' },
+        3: { cellWidth: 20, halign: 'right' },
+        4: { cellWidth: 18, halign: 'center' },
+      },
+      margin: { left: margin, right: margin },
+      styles: { cellPadding: 1.5 },
+      tableLineWidth: 0.1,
+      tableLineColor: [220, 220, 230],
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  // Debts table
+  if (cobrar.length > 0) {
+    if (y > 250) { doc.addPage(); y = margin + 10; }
+    doc.setTextColor(20, 20, 30);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Cuentas por Cobrar / Abonos', margin, y);
+    y += 4;
+
+    const debtRows = cobrar.map(x => [
+      x.concepto || '',
+      '$' + (+x.monto || 0).toFixed(2),
+      x.fecha || '',
+      x.vence || '',
+      x.estado || 'Pendiente',
+    ]);
+    doc.autoTable({
+      startY: y,
+      head: [['Concepto', 'Monto', 'Fecha', 'Vence', 'Estado']],
+      body: debtRows,
+      theme: 'plain',
+      headStyles: { fillColor: primary, fontSize: 8, halign: 'center' },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 'auto' },
+        1: { cellWidth: 22, halign: 'right' },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 18, halign: 'center' },
+      },
+      margin: { left: margin, right: margin },
+      styles: { cellPadding: 1.5 },
+      tableLineWidth: 0.1,
+      tableLineColor: [220, 220, 230],
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  // Footer
+  if (y > 270) doc.addPage();
+  doc.setDrawColor(200, 200, 210);
+  doc.line(margin, y, pageW - margin, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }), margin, y);
+  doc.text('Glowup Store © Todos los derechos reservados', pageW - margin, y, { align: 'right' });
+
+  doc.save('cliente_' + (c.nombre || 'cliente').replace(/\s+/g, '_') + '.pdf');
+  toast('PDF exportado');
 }
 
 // ══════════════════════════════════════
@@ -1122,6 +1288,13 @@ document.addEventListener('click', e => {
     else if (type === 'venta') deleteVenta(del.dataset.id);
     else if (type === 'cobrar') deleteCobrar(del.dataset.id);
     else if (type === 'pagar') deletePagar(del.dataset.id);
+    return;
+  }
+
+  const pdfBtn = e.target.closest('[data-pdf]');
+  if (pdfBtn) {
+    const type = pdfBtn.dataset.pdf;
+    if (type === 'cliente') exportClientePDF(pdfBtn.dataset.id);
     return;
   }
 
