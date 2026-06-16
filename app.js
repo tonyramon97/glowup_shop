@@ -450,29 +450,29 @@ function renderClientes() {
   function customerItem(c, idx) {
     var deuda = deudas[c.id] || 0;
     var hasDeuda = deuda > 0;
-    return '<div class="flex items-center justify-between p-md border-b border-outline-variant hover:bg-surface-container-low transition-colors cursor-pointer group">' +
-      '<div class="flex items-center gap-md">' +
-        '<div class="w-12 h-12 rounded-full ' + avatarColors[idx % avatarColors.length] + ' flex items-center justify-center font-bold text-sm shrink-0">' + initials(c.nombre) + '</div>' +
-        '<div>' +
-          '<p class="font-headline-md text-body-lg font-semibold text-on-surface">' + esc(c.nombre) + '</p>' +
-          '<p class="font-label-sm text-on-surface-variant flex items-center gap-xs">' +
-            (c.telefono ? '<span class="material-symbols-outlined text-[14px]">call</span>' + esc(c.telefono) : '') +
-          '</p>' +
+    return '<div class="p-md border-b border-outline-variant hover:bg-surface-container-low transition-colors cursor-pointer group">' +
+      '<div class="flex items-center justify-between">' +
+        '<div class="flex items-center gap-md">' +
+          '<div class="w-12 h-12 rounded-full ' + avatarColors[idx % avatarColors.length] + ' flex items-center justify-center font-bold text-sm shrink-0">' + initials(c.nombre) + '</div>' +
+          '<div>' +
+            '<p class="font-headline-md text-body-lg font-semibold text-on-surface">' + esc(c.nombre) + '</p>' +
+            '<p class="font-label-sm text-on-surface-variant flex items-center gap-xs">' +
+              (c.telefono ? '<span class="material-symbols-outlined text-[14px]">call</span>' + esc(c.telefono) : '') +
+            '</p>' +
+          '</div>' +
         '</div>' +
-      '</div>' +
-      '<div class="flex items-center gap-2">' +
         '<div class="text-right">' +
           '<p class="font-headline-md ' + (hasDeuda ? 'text-error' : 'text-secondary') + '">' + (hasDeuda ? fmtMoney(deuda) : fmtMoney(0)) + '</p>' +
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + (hasDeuda ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container') + '">' + (hasDeuda ? 'Debe' : 'Al d\u00EDa') + '</span>' +
         '</div>' +
-        '<div class="flex flex-col gap-1">' +
-          '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="cliente" data-id="' + c.id + '" title="Exportar PDF">' +
-            '<span class="material-symbols-outlined text-lg text-primary">description</span></button>' +
-          '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="' + c.id + '">' +
-            '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
-          '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="cliente" data-id="' + c.id + '">' +
-            '<span class="material-symbols-outlined text-lg text-error">delete</span></button>' +
-        '</div>' +
+      '</div>' +
+      '<div class="flex items-center justify-end gap-1 mt-1">' +
+        '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="cliente" data-id="' + c.id + '" title="Exportar PDF">' +
+          '<span class="material-symbols-outlined text-lg text-primary">description</span></button>' +
+        '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="' + c.id + '">' +
+          '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
+        '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="cliente" data-id="' + c.id + '">' +
+          '<span class="material-symbols-outlined text-lg text-error">delete</span></button>' +
       '</div>' +
     '</div>';
   }
@@ -573,9 +573,11 @@ function exportClientePDF(id) {
 
   const ventas = DB.get('ventas').filter(v => v.clienteId === id).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const cobrar = DB.get('cobrar').filter(x => x.clienteId === id);
-  const deudaPendiente = cobrar.filter(x => x.estado !== 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
-  const totalPagado = cobrar.filter(x => x.estado === 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
   const totalComprado = ventas.reduce((s, v) => s + (+v.total || 0), 0);
+  const efectivo = ventas.filter(v => v.pago !== 'Cr\u00E9dito').reduce((s, v) => s + (+v.total || 0), 0);
+  const creditoPagado = cobrar.filter(x => x.estado === 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
+  const deudaPendiente = cobrar.filter(x => x.estado !== 'Pagado').reduce((s, x) => s + (+x.monto || 0), 0);
+  const totalPagado = efectivo + creditoPagado;
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -599,19 +601,6 @@ function exportClientePDF(id) {
   let x = margin + 10;
   let y = 24;
   const innerW = contentW - 20;
-
-  // ── PAID stamp overlay (if no pending debt) ──
-  if (deudaPendiente === 0 && totalPagado > 0) {
-    doc.setTextColor(0, 110, 47);
-    doc.setFontSize(36);
-    doc.setFont(undefined, 'bold');
-    doc.text('PAGADO', pageW - margin - 20, 45, { align: 'right', angle: -15 });
-  } else if (deudaPendiente > 0) {
-    doc.setTextColor(186, 26, 26);
-    doc.setFontSize(36);
-    doc.setFont(undefined, 'bold');
-    doc.text('PENDIENTE', pageW - margin - 20, 45, { align: 'right', angle: -15 });
-  }
 
   // ── Header ──
   doc.setTextColor(primary[0], primary[1], primary[2]);
@@ -658,6 +647,19 @@ function exportClientePDF(id) {
   doc.setTextColor(0, 0, 0);
   doc.text(today(), x + innerW - 40, 49);
 
+  // ── Stamp overlay (on top of card) ──
+  if (deudaPendiente === 0 && totalPagado > 0) {
+    doc.setTextColor(0, 110, 47);
+    doc.setFontSize(28);
+    doc.setFont(undefined, 'bold');
+    doc.text('PAGADO', x + innerW - 6, 52, { align: 'right', angle: -15 });
+  } else if (deudaPendiente > 0) {
+    doc.setTextColor(186, 26, 26);
+    doc.setFontSize(28);
+    doc.setFont(undefined, 'bold');
+    doc.text('PENDIENTE', x + innerW - 6, 52, { align: 'right', angle: -15 });
+  }
+
   // ── Summary badges ──
   y += 2;
   const badgeW = (innerW - 8) / 3;
@@ -679,7 +681,7 @@ function exportClientePDF(id) {
 
   y += 26;
 
-  // ── Sales section (ITEM | CANT | TOTAL style) ──
+  // ── Sales section ──
   if (ventas.length > 0) {
     doc.setDrawColor(195, 197, 217);
     doc.line(x, y, x + innerW, y);
@@ -697,45 +699,30 @@ function exportClientePDF(id) {
     doc.setTextColor(gray[0], gray[1], gray[2]);
     doc.setFontSize(7);
     doc.setFont(undefined, 'bold');
-    const col1 = x + 4;
-    const colQty = x + innerW - 36;
+    const colFecha = x + 4;
+    const colProd = colFecha + 24;
+    const colPago = x + innerW - 36;
     const colTotal = x + innerW - 4;
-    doc.text('ITEM', col1, y + 4);
-    doc.text('CANT', colQty, y + 4);
+    doc.text('FECHA', colFecha, y + 4);
+    doc.text('PRODUCTO(s)', colProd, y + 4);
+    doc.text('PAGO', colPago, y + 4);
     doc.text('TOTAL', colTotal, y + 4, { align: 'right' });
     y += 9;
 
-    ventas.forEach(function(v, i) {
-      if (y > 265) { doc.addPage(); y = 20; }
-      (v.items || []).forEach(function(item, j) {
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        doc.text(item.nombre || 'Producto', col1, y);
-        doc.setFontSize(8);
-        doc.setTextColor(gray[0], gray[1], gray[2]);
-        doc.text('$' + (+item.precio || 0).toFixed(2) + ' / und', col1, y + 3.5);
-
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        doc.text('' + item.qty, colQty, y);
-
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(0, 0, 0);
-        doc.text('$' + (+item.qty * +item.precio || 0).toFixed(2), colTotal, y, { align: 'right' });
-
-        y += 8;
-      });
-      // Sale total line
-      doc.setDrawColor(240, 242, 248);
-      doc.line(x, y - 1, x + innerW, y - 1);
+    ventas.forEach(function(v) {
+      if (y > 268) { doc.addPage(); y = 20; }
+      const itemsStr = (v.items || []).map(function(it) { return it.nombre + ' x' + it.qty; }).join(', ');
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text(fmtDate(v.fecha), colFecha, y);
+      doc.text(itemsStr, colProd, y);
+      doc.setTextColor(gray[0], gray[1], gray[2]);
+      doc.text(v.pago || 'Contado', colPago, y);
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(primary[0], primary[1], primary[2]);
-      doc.text(fmtDate(v.fecha) + ' - ' + (v.pago || 'Contado'), col1, y + 1);
-      doc.text('$' + (+v.total || 0).toFixed(2), colTotal, y + 1, { align: 'right' });
-      y += 7;
+      doc.setTextColor(0, 0, 0);
+      doc.text('$' + (+v.total || 0).toFixed(2), colTotal, y, { align: 'right' });
+      y += 6;
     });
     y += 4;
   }
@@ -804,12 +791,18 @@ function exportClientePDF(id) {
 
     cobrar.forEach(function(cb) {
       if (y > 268) { doc.addPage(); y = 20; }
+      var venceStr = cb.vence;
+      if (!venceStr && cb.fecha) {
+        var fd = new Date(cb.fecha + 'T12:00:00');
+        fd.setMonth(fd.getMonth() + 1);
+        venceStr = fd.toISOString().slice(0, 10);
+      }
       doc.setFont(undefined, 'normal');
       doc.setFontSize(8);
       doc.setTextColor(0, 0, 0);
       doc.text(cb.concepto || '', dc1, y);
       doc.setFontSize(8);
-      doc.text(cb.vence || '\u2014', dc2, y);
+      doc.text(venceStr ? fmtDate(venceStr) : '\u2014', dc2, y);
       doc.setFont(undefined, 'bold');
       doc.text('$' + (+cb.monto || 0).toFixed(2), dc3, y);
       doc.setTextColor(cb.estado === 'Pagado' ? secondary[0] : error[0], cb.estado === 'Pagado' ? secondary[1] : error[1], cb.estado === 'Pagado' ? secondary[2] : error[2]);
@@ -837,8 +830,238 @@ function exportClientePDF(id) {
     doc.circle(dotX + offset, y + 4, 1, 'F');
   });
 
-  doc.save('cliente_' + (c.nombre || 'cliente').replace(/\s+/g, '_') + '.pdf');
-  toast('PDF exportado');
+  const blob = doc.output('blob');
+  showPDFActions(blob, 'cliente_' + (c.nombre || 'cliente').replace(/\s+/g, '_') + '.pdf', c.nombre);
+}
+
+function exportVentaPDF(id) {
+  if (typeof window.jspdf === 'undefined') { toast('Error al cargar la librer\u00EDa PDF', 'error'); return; }
+  var ventas = DB.get('ventas');
+  var v = ventas.find(function(x) { return x.id === id; });
+  if (!v) { toast('Venta no encontrada', 'error'); return; }
+
+  var cobrar = DB.get('cobrar').filter(function(x) { return x.ventaId === id; });
+  var cuotasCount = cobrar.length;
+  var montoCuota = cuotasCount > 0 ? (+v.total / cuotasCount) : 0;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageW = 210;
+  const margin = 15;
+  const contentW = pageW - margin * 2;
+  const primary = [0, 62, 199];
+  const surfaceLow = [242, 243, 255];
+  const gray = [115, 118, 134];
+  const secondary = [0, 110, 47];
+
+  var x = margin + 10;
+  var y = 24;
+  const innerW = contentW - 20;
+
+  // Receipt card
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'F');
+  doc.setDrawColor(195, 197, 217);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'S');
+
+  // Header
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.text('Glowup Store', x, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.text('COMPROBANTE DE VENTA', x, y);
+
+  // Client & sale info card
+  y += 10;
+  doc.setDrawColor(195, 197, 217);
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 22, 4, 4, 'FD');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text(v.clienteNombre || 'Consumidor final', x + 6, y + 8);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Fecha: ' + fmtDate(v.fecha), x + 6, y + 16);
+  doc.text('Pago: ' + (v.pago || 'Contado'), x + innerW - 6, y + 8, { align: 'right' });
+
+  y += 30;
+
+  // ── ITEMS table ──
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 2;
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.text('Art\u00EDculos', x, y += 6);
+
+  // Header
+  y += 3;
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.rect(x, y, innerW, 6, 'F');
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'bold');
+  var c1 = x + 4;
+  var c2 = x + innerW - 60;
+  var c3 = x + innerW - 34;
+  var c4 = x + innerW - 4;
+  doc.text('PRODUCTO', c1, y + 4);
+  doc.text('CANT', c2, y + 4);
+  doc.text('PRECIO', c3, y + 4);
+  doc.text('TOTAL', c4, y + 4, { align: 'right' });
+  y += 9;
+
+  (v.items || []).forEach(function(item) {
+    if (y > 262) { doc.addPage(); y = 20; }
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(item.nombre || 'Producto', c1, y);
+    doc.text('' + item.qty, c2, y);
+    doc.text('$' + (+item.precio || 0).toFixed(2), c3, y);
+    doc.setFont(undefined, 'bold');
+    doc.text('$' + (+item.qty * +item.precio || 0).toFixed(2), c4, y, { align: 'right' });
+    y += 7;
+  });
+
+  y += 2;
+
+  // ── Total box ──
+  if (y > 252) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 2;
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 14, 4, 4, 'F');
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Total', x + 6, y + 9);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.text('$' + (+v.total || 0).toFixed(2), x + innerW - 6, y + 9, { align: 'right' });
+  y += 22;
+
+  // ── Installments info (if credit) ──
+  if (cuotasCount > 0) {
+    doc.setDrawColor(195, 197, 217);
+    doc.line(x, y, x + innerW, y);
+    y += 2;
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Detalle de Cuotas', x, y += 6);
+    y += 2;
+
+    // Header
+    doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+    doc.rect(x, y, innerW, 6, 'F');
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    var q1 = x + 4;
+    var q2 = x + innerW - 50;
+    var q3 = x + innerW - 4;
+    doc.text('CUOTA', q1, y + 4);
+    doc.text('VENCE', q2, y + 4);
+    doc.text('MONTO', q3, y + 4, { align: 'right' });
+    y += 9;
+
+    cobrar.forEach(function(cb, i) {
+      if (y > 268) { doc.addPage(); y = 20; }
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Cuota ' + (i + 1) + '/' + cuotasCount, q1, y);
+      doc.text(cb.vence ? fmtDate(cb.vence) : '\u2014', q2, y);
+      doc.setFont(undefined, 'bold');
+      doc.text('$' + (+cb.monto || 0).toFixed(2), q3, y, { align: 'right' });
+      y += 7;
+    });
+    y += 4;
+  }
+
+  // ── Footer ──
+  if (y > 272) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }), x, y);
+
+  // Decorative dots
+  doc.setFillColor(195, 197, 217);
+  [-6, 0, 6].forEach(function(offset) {
+    doc.circle(x + innerW / 2 + offset, y + 4, 1, 'F');
+  });
+
+  var blob = doc.output('blob');
+  showPDFActions(blob, 'venta_' + (v.id || 'venta') + '.pdf', 'Venta');
+}
+
+function showPDFActions(blob, fileName, title) {
+  var blobUrl = URL.createObjectURL(blob);
+
+  var oldBar = document.getElementById('pdf-actions');
+  if (oldBar) oldBar.remove();
+
+  var bar = document.createElement('div');
+  bar.id = 'pdf-actions';
+  bar.className = 'fixed bottom-24 left-4 right-4 z-[999] bg-surface/90 backdrop-blur-2xl border border-outline-variant/30 rounded-2xl shadow-xl p-3 flex items-center gap-2 animate-slide-up';
+  bar.innerHTML =
+    '<span class="text-sm font-semibold text-on-surface flex-1 truncate">' + esc(title) + '</span>' +
+    '<button class="pdf-action-btn px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95 flex items-center gap-1.5 text-sm font-medium" data-action="pdf-download">' +
+      '<span class="material-symbols-outlined text-lg">download</span> Guardar</button>' +
+    '<button class="pdf-action-btn px-3 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95 flex items-center gap-1.5 text-sm font-medium" data-action="pdf-print">' +
+      '<span class="material-symbols-outlined text-lg">print</span> Imprimir</button>' +
+    (navigator.share
+      ? '<button class="pdf-action-btn px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-all active:scale-95 flex items-center gap-1.5 text-sm font-medium" data-action="pdf-share">' +
+        '<span class="material-symbols-outlined text-lg">share</span> Compartir</button>'
+      : ''
+    );
+
+  document.body.appendChild(bar);
+
+  bar.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action === 'pdf-download') {
+      var a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      a.click();
+      toast('PDF descargado');
+    } else if (action === 'pdf-print') {
+      var w = window.open(blobUrl);
+      if (w) { w.onload = function() { w.print(); }; }
+    } else if (action === 'pdf-share') {
+      navigator.share({ files: [new File([blob], fileName, { type: 'application/pdf' })], title: fileName }).catch(function() {});
+    }
+    bar.remove();
+  });
+
+  setTimeout(function() {
+    var closeHandler = function(ev) {
+      if (!bar.contains(ev.target)) {
+        bar.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 100);
+
+  toast('PDF listo');
 }
 
 // ══════════════════════════════════════
@@ -894,6 +1117,8 @@ function renderVentas() {
           '<p class="font-label-sm text-label-sm text-on-surface-variant">' + fmtDate(v.fecha) + '</p>' +
           '<div class="flex items-center gap-1">' +
             '<span class="px-sm py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ' + badgeClass + '">' + esc(pago) + '</span>' +
+            '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="venta" data-id="' + v.id + '" title="Exportar PDF">' +
+              '<span class="material-symbols-outlined text-base text-primary">description</span></button>' +
             '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="venta" data-id="' + v.id + '">' +
               '<span class="material-symbols-outlined text-base text-error">delete</span></button>' +
           '</div>' +
@@ -1062,8 +1287,7 @@ function saveVenta() {
     const cobrar = DB.get('cobrar');
     const fechaBase = venta.fecha ? new Date(venta.fecha + 'T12:00:00') : new Date();
     for (let i = 0; i < cuotas; i++) {
-      const vence = new Date(fechaBase);
-      vence.setMonth(vence.getMonth() + i + 1);
+      const vence = new Date(fechaBase.getFullYear(), fechaBase.getMonth() + i + 2, 0);
       cobrar.push({
         id: uid(), clienteId, clienteNombre,
         monto: i === cuotas - 1 ? +(total - montoCuota * (cuotas - 1)).toFixed(2) : montoCuota,
@@ -1422,6 +1646,7 @@ document.addEventListener('click', e => {
   if (pdfBtn) {
     const type = pdfBtn.dataset.pdf;
     if (type === 'cliente') exportClientePDF(pdfBtn.dataset.id);
+    else if (type === 'venta') exportVentaPDF(pdfBtn.dataset.id);
     return;
   }
 
