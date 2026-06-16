@@ -225,7 +225,7 @@ function renderDashboard() {
           : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-outline-variant text-on-surface-variant font-label-sm text-label-sm"><th class="pb-sm px-sm">FECHA</th><th class="pb-sm px-sm">CLIENTE</th><th class="pb-sm px-sm">PAGO</th><th class="pb-sm px-sm text-right">TOTAL</th></tr></thead><tbody class="font-body-md text-body-md">${recent.map(v => `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
               <td class="py-md px-sm">${fmtDate(v.fecha)}</td>
-              <td class="py-md px-sm">${v.cliente ? esc(v.cliente) : '\u2014'}</td>
+              <td class="py-md px-sm">${v.clienteNombre ? esc(v.clienteNombre) : '\u2014'}</td>
               <td class="py-md px-sm"><span class="${v.pago === 'Cr\u00E9dito' ? 'bg-warning-bg text-warning' : 'bg-success-bg text-success'} px-sm py-1 rounded-full text-xs font-bold uppercase">${esc(v.pago || 'Contado')}</span></td>
               <td class="py-md px-sm text-right font-bold text-on-surface">${fmtMoney(v.total)}</td>
             </tr>
@@ -465,7 +465,7 @@ function renderClientes() {
           '<p class="font-headline-md ' + (hasDeuda ? 'text-error' : 'text-secondary') + '">' + (hasDeuda ? fmtMoney(deuda) : fmtMoney(0)) + '</p>' +
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + (hasDeuda ? 'bg-error-container text-on-error-container' : 'bg-secondary-container text-on-secondary-container') + '">' + (hasDeuda ? 'Debe' : 'Al d\u00EDa') + '</span>' +
         '</div>' +
-        '<div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+        '<div class="flex flex-col gap-1">' +
           '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="cliente" data-id="' + c.id + '" title="Exportar PDF">' +
             '<span class="material-symbols-outlined text-lg text-primary">description</span></button>' +
           '<button class="p-1 rounded-lg hover:bg-primary/10 transition-colors" data-edit="cliente" data-id="' + c.id + '">' +
@@ -782,7 +782,7 @@ function renderVentas() {
           '<p class="font-label-sm text-label-sm text-on-surface-variant">' + fmtDate(v.fecha) + '</p>' +
           '<div class="flex items-center gap-1">' +
             '<span class="px-sm py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight ' + badgeClass + '">' + esc(pago) + '</span>' +
-            '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100" data-delete="venta" data-id="' + v.id + '">' +
+            '<button class="p-1 rounded-lg hover:bg-error/10 transition-colors" data-delete="venta" data-id="' + v.id + '">' +
               '<span class="material-symbols-outlined text-base text-error">delete</span></button>' +
           '</div>' +
         '</div>' +
