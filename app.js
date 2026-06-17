@@ -258,7 +258,7 @@ function renderInventario() {
   const q = (document.getElementById('inv-search')?.value || '').toLowerCase();
   const filtro = document.getElementById('inv-filter-state')?.dataset.filter || 'todos';
 
-  let filtered = [...productos];
+  let filtered = [...productos].reverse();
   if (q) filtered = filtered.filter(p => p.nombre.toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q));
   if (filtro === 'low') filtered = filtered.filter(p => +p.stock > 0 && +p.stock <= +p.stockMin);
   else if (filtro === 'out') filtered = filtered.filter(p => !p.stock || +p.stock === 0);
@@ -433,7 +433,7 @@ async function deleteProducto(id) {
 //  CLIENTES
 // ══════════════════════════════════════
 function renderClientes() {
-  var clientes = DB.get('clientes');
+  var clientes = DB.get('clientes').reverse();
   var cobrar = DB.get('cobrar');
   var mes = today().slice(0, 7);
   var totalDeuda = cobrar.filter(function(c) { return c.estado !== 'Pagado'; }).reduce(function(s, c) { return s + (+c.monto || 0); }, 0);
@@ -1523,8 +1523,8 @@ async function deleteVenta(id) {
 function renderFinanzas() {
   var ftab = document.getElementById('ftab-state')?.dataset.ftab || 'cobrar';
   var isCobrar = ftab === 'cobrar';
-  var cobrar = DB.get('cobrar');
-  var pagar = DB.get('pagar');
+  var cobrar = DB.get('cobrar').reverse();
+  var pagar = DB.get('pagar').reverse();
   var totalCobrar = cobrar.filter(function(c) { return c.estado !== 'Pagado'; }).reduce(function(s, c) { return s + (+c.monto || 0); }, 0);
   var totalPagar = pagar.filter(function(p) { return p.estado !== 'Pagado'; }).reduce(function(s, p) { return s + (+p.monto || 0); }, 0);
 
