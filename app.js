@@ -873,7 +873,7 @@ function exportVentaPDF(id) {
   doc.setTextColor(gray[0], gray[1], gray[2]);
   doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
-  doc.text('COMPROBANTE DE VENTA', x, y);
+  doc.text('COMPROBANTE', x, y);
 
   // Client & sale info card
   y += 10;
@@ -1007,6 +1007,202 @@ function exportVentaPDF(id) {
 
   var blob = doc.output('blob');
   showPDFActions(blob, 'venta_' + (v.id || 'venta') + '.pdf', 'Venta');
+}
+
+function exportCobrarPDF(id) {
+  if (typeof window.jspdf === 'undefined') { toast('Error al cargar la librer\u00EDa PDF', 'error'); return; }
+  var cobrarList = DB.get('cobrar');
+  var item = cobrarList.find(function(x) { return x.id === id; });
+  if (!item) { toast('Registro no encontrado', 'error'); return; }
+
+  var esCobrar = !item.proveedor;
+  var nameField = esCobrar ? 'clienteNombre' : 'proveedor';
+  var name = item[nameField] || '\u2014';
+
+  // Calcular pendiente si pertenece a una venta con m\u00FAltiples cuotas
+  var pendiente = 0;
+  if (item.ventaId) {
+    pendiente = cobrarList.filter(function(x) { return x.ventaId === item.ventaId && x.estado !== 'Pagado'; }).reduce(function(s, x) { return s + (+x.monto || 0); }, 0);
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageW = 210;
+  const margin = 15;
+  const contentW = pageW - margin * 2;
+  const primary = [0, 62, 199];
+  const surfaceLow = [242, 243, 255];
+  const gray = [115, 118, 134];
+  const secondary = [0, 110, 47];
+  const error = [186, 26, 26];
+
+  var x = margin + 10;
+  var y = 24;
+  const innerW = contentW - 20;
+
+  // Receipt card
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'F');
+  doc.setDrawColor(195, 197, 217);
+  doc.roundedRect(margin, 10, contentW, 277, 6, 6, 'S');
+
+  // Header
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.text('Glowup Store', x, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(9);
+  doc.setFont(undefined, 'normal');
+  doc.text(esCobrar ? 'COMPROBANTE DE COBRO' : 'COMPROBANTE DE PAGO', x, y);
+
+  // Info card
+  y += 10;
+  doc.setDrawColor(195, 197, 217);
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 20, 4, 4, 'FD');
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text(name, x + 6, y + 8);
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Fecha: ' + fmtDate(item.fecha), x + 6, y + 15);
+  doc.text('Estado: ' + (item.estado || 'Pendiente'), x + innerW - 6, y + 8, { align: 'right' });
+
+  y += 30;
+
+  // Concepto
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 4;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(8);
+  doc.setFont(undefined, 'normal');
+  doc.text('Concepto', x, y);
+  y += 4;
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.text(item.concepto || '\u2014', x, y);
+  y += 10;
+
+  // Vence
+  if (item.vence) {
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.text('Vencimiento', x, y);
+    y += 4;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text(fmtDate(item.vence), x, y);
+    y += 10;
+  }
+
+  // ── Amount box ──
+  if (y > 252) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 2;
+  doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+  doc.roundedRect(x, y, innerW, 12, 4, 4, 'F');
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.text('Monto', x + 6, y + 8);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.text('$' + (+item.monto || 0).toFixed(2), x + innerW - 6, y + 8, { align: 'right' });
+  y += 20;
+
+  // ── Pending balance ──
+  if (item.ventaId) {
+    doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+    doc.roundedRect(x, y, innerW, 10, 4, 4, 'F');
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.text('Saldo pendiente', x + 6, y + 7);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(pendiente > 0 ? error[0] : secondary[0], pendiente > 0 ? error[1] : secondary[1], pendiente > 0 ? error[2] : secondary[2]);
+    doc.text('$' + pendiente.toFixed(2), x + innerW - 6, y + 7, { align: 'right' });
+    y += 16;
+  }
+
+  // ── Related installments ──
+  if (item.ventaId) {
+    var hermanas = cobrarList.filter(function(x) { return x.ventaId === item.ventaId; });
+    if (hermanas.length > 1) {
+      if (y > 255) { doc.addPage(); y = 20; }
+      doc.setDrawColor(195, 197, 217);
+      doc.line(x, y, x + innerW, y);
+      y += 2;
+      doc.setTextColor(primary[0], primary[1], primary[2]);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('Cuotas Relacionadas', x, y += 6);
+      y += 2;
+
+      // Header
+      doc.setFillColor(surfaceLow[0], surfaceLow[1], surfaceLow[2]);
+      doc.rect(x, y, innerW, 6, 'F');
+      doc.setTextColor(gray[0], gray[1], gray[2]);
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'bold');
+      var q1 = x + 4;
+      var q2 = x + innerW - 50;
+      var q3 = x + innerW - 4;
+      doc.text('DESCRIPCI\u00D3N', q1, y + 4);
+      doc.text('VENCE', q2, y + 4);
+      doc.text('MONTO', q3, y + 4, { align: 'right' });
+      y += 9;
+
+      hermanas.forEach(function(h) {
+        if (y > 268) { doc.addPage(); y = 20; }
+        var isThis = h.id === item.id;
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(isThis ? primary[0] : 0, isThis ? primary[1] : 0, isThis ? primary[2] : 0);
+        doc.text((h.concepto || 'Cuota').substring(0, 30), q1, y);
+        doc.text(h.vence ? fmtDate(h.vence) : '\u2014', q2, y);
+        doc.setFont(undefined, isThis ? 'bold' : 'normal');
+        doc.text('$' + (+h.monto || 0).toFixed(2), q3, y, { align: 'right' });
+        if (isThis) {
+          y += 3;
+          doc.setTextColor(secondary[0], secondary[1], secondary[2]);
+          doc.setFontSize(6);
+          doc.text('\u2190 Este comprobante', q1, y);
+          doc.setTextColor(0, 0, 0);
+        }
+        y += 5;
+      });
+      y += 4;
+    }
+  }
+
+  // ── Footer ──
+  if (y > 272) { doc.addPage(); y = 20; }
+  doc.setDrawColor(195, 197, 217);
+  doc.line(x, y, x + innerW, y);
+  y += 5;
+  doc.setTextColor(gray[0], gray[1], gray[2]);
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+  doc.text('Generado el ' + new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }), x, y);
+
+  doc.setFillColor(195, 197, 217);
+  [-6, 0, 6].forEach(function(offset) {
+    doc.circle(x + innerW / 2 + offset, y + 4, 1, 'F');
+  });
+
+  var blob = doc.output('blob');
+  showPDFActions(blob, (esCobrar ? 'cobro_' : 'pago_') + (item.id || '') + '.pdf', name);
 }
 
 function showPDFActions(blob, fileName, title) {
@@ -1379,6 +1575,8 @@ function renderFinanzas() {
                 '<span class="material-symbols-outlined text-sm align-middle">check</span> ' + actionLabel + '</button>'
             : ''
           ) +
+          '<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-pdf="' + actionAttr + '" data-id="' + item.id + '" title="PDF">' +
+            '<span class="material-symbols-outlined text-lg text-primary">description</span></button>' +
           '<button class="p-1.5 rounded-lg hover:bg-primary/10 transition-colors" data-edit="' + actionAttr + '" data-id="' + item.id + '">' +
             '<span class="material-symbols-outlined text-lg text-on-surface-variant">edit</span></button>' +
           '<button class="p-1.5 rounded-lg hover:bg-error/10 transition-colors" data-delete="' + actionAttr + '" data-id="' + item.id + '">' +
@@ -1470,8 +1668,30 @@ function saveCuentaCobrar() {
     estado: 'Pendiente',
   };
   const lista = DB.get('cobrar');
-  if (editingId) { const i = lista.findIndex(x => x.id === editingId); if (i >= 0) lista[i] = { ...lista[i], ...cuenta, estado: lista[i].estado }; }
-  else { lista.push(cuenta); }
+  if (editingId) {
+    const i = lista.findIndex(x => x.id === editingId);
+    if (i >= 0) {
+      const old = lista[i];
+      lista[i] = { ...old, ...cuenta, estado: old.estado };
+      // Auto-recalcular cuotas hermanas si pertenece a una venta
+      if (old.ventaId && old.estado !== 'Pagado') {
+        const hermanas = lista.filter(function(x) { return x.ventaId === old.ventaId && x.id !== editingId && x.estado !== 'Pagado'; });
+        if (hermanas.length > 0) {
+          var totalVenta = DB.get('ventas').find(function(v) { return v.id === old.ventaId; });
+          var totalRef = totalVenta ? +totalVenta.total : hermanas.reduce(function(s, x) { return s + (+x.monto || 0); }, 0) + (+lista[i].monto || 0);
+          var pagadasSum = lista.filter(function(x) { return x.ventaId === old.ventaId && x.estado === 'Pagado'; }).reduce(function(s, x) { return s + (+x.monto || 0); }, 0);
+          var restante = totalRef - pagadasSum - (+lista[i].monto || 0);
+          var montoHermana = +(restante / hermanas.length).toFixed(2);
+          hermanas.forEach(function(h, idx) {
+            var j = lista.findIndex(function(x) { return x.id === h.id; });
+            if (j >= 0) {
+              lista[j].monto = idx === hermanas.length - 1 ? +(restante - montoHermana * (hermanas.length - 1)).toFixed(2) : montoHermana;
+            }
+          });
+        }
+      }
+    }
+  } else { lista.push(cuenta); }
   DB.set('cobrar', lista);
   closeModal('modal-cobrar');
   toast(editingId ? 'Cuenta actualizada' : 'Cuenta registrada');
@@ -1647,6 +1867,7 @@ document.addEventListener('click', e => {
     const type = pdfBtn.dataset.pdf;
     if (type === 'cliente') exportClientePDF(pdfBtn.dataset.id);
     else if (type === 'venta') exportVentaPDF(pdfBtn.dataset.id);
+    else if (type === 'cobrar' || type === 'pagar') exportCobrarPDF(pdfBtn.dataset.id);
     return;
   }
 
